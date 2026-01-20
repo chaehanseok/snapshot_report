@@ -9,17 +9,18 @@
 
 <body>
   <div class="page">
+
     <!-- Header -->
     <header class="header">
       <div class="brand">
         <div class="brand__logo">
-          <!-- 로고가 있으면 넣고, 없으면 숨김 처리 -->
           {% if logo_data_uri %}
             <img src="{{ logo_data_uri }}" alt="logo" />
           {% else %}
             <div class="brand__mark">M</div>
           {% endif %}
         </div>
+
         <div class="brand__text">
           <div class="brand__name">{{ brand_name }}</div>
           <div class="brand__sub">{{ brand_subtitle }}</div>
@@ -37,7 +38,7 @@
       </div>
     </header>
 
-    <!-- Intro -->
+    <!-- Summary -->
     <section class="section">
       <h2 class="section__title">요약</h2>
       <ul class="bullets">
@@ -50,6 +51,7 @@
     <!-- Stat Cards -->
     <section class="section">
       <h2 class="section__title">현황 통계 예시</h2>
+
       <div class="cards">
         {% for card in stats.cards %}
           <div class="card">
@@ -58,12 +60,13 @@
           </div>
         {% endfor %}
       </div>
+
       <div class="note">
         * 위 내용은 동일 연령·성별 집단의 통계 기반 요약이며, 개인별 상황에 따라 달라질 수 있습니다.
       </div>
     </section>
 
-    <!-- Gap Questions -->
+    <!-- Questions -->
     <section class="section">
       <h2 class="section__title">점검 질문</h2>
       <ol class="questions">
@@ -105,7 +108,7 @@
         <div class="planner-phone">연락처 : {{ planner.phone_display }}</div>
         {% if planner.email %}
         <div class="planner-email">이메일 : {{ planner.email }}</div>
-        {% endif %}  
+        {% endif %}
       </div>
     </section>
 
@@ -114,6 +117,7 @@
       <div class="footer__disclaimer">{{ footer.disclaimer }}</div>
       <div class="footer__legal">{{ footer.legal_note }}</div>
     </footer>
+
   </div>
 </body>
 </html>
