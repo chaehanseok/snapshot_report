@@ -10,6 +10,7 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
+from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
@@ -123,150 +124,296 @@ def html_to_pdf_bytes(html: str, css_file: Path) -> bytes:
     # base_url is needed for relative asset loading
     return HTML(string=html, base_url=str(TEMPLATES_DIR)).write_pdf(stylesheets=[CSS(filename=str(css_file))])
 
+def _format_phone(phone: str) -> str:
+    d = re.sub(r"\D", "", phone or "")
+    if len(d) == 11:  # 010xxxxxxxx
+        return f"{d[:3]}-{d[3:7]}-{d[7:]}"
+    if len(d) == 10:  # 0xx/010-xxx-xxxx
+        return f"{d[:3]}-{d[3:6]}-{d[6:]}"
+    return phone
+
+
 def reportlab_snapshot_pdf(context: dict) -> bytes:
     """
-    Coverage Snapshot Report (single page) generated via ReportLab.
-    Uses the already-prepared context values (customer/segment/stats/planner/footer).
+    Coverage Snapshot Report (1-page) via ReportLab.
+    Design goals: typographic hierarchy, consistent spacing, tidy cards, light table styling.
     """
+    register_korean_fonts()
 
-    register_korean_font()
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
-    width, height = A4
+    W, H = A4
 
-    # Margins
-    left = 14 * mm
-    right = width - 14 * mm
-    y = height - 16 * mm
+    # ===== Layout constants =====
+    M_L = 14 * mm
+    M_R = 14 * mm
+    M_T = 14 * mm
+    M_B = 12 * mm
 
-    def draw_text(x, y, text, size=10, bold=False):
-        c.setFont("NotoSansKR", size)
-        c.drawString(x, y, text)
+    X0 = M_L
+    X1 = W - M_R
+    CW = X1 - X0
 
-    def draw_wrapped(x, y, text, max_width, size=10, leading=14):
-        # very simple wrap by character count approximation (sufficient for MVP)
-        c.setFont("NotoSansKR", size)
-        # heuristic: average glyph width ~0.5*size points; convert max_width points to char count
-        approx_chars = max(12, int(max_width / (size * 0.55)))
+    # Spacing rules
+    GAP_SECTION_TOP = 10 * mm
+    GAP_TITLE_BOTTOM = 4 * mm
+    GAP_SECTION_BOTTOM = 6 * mm
+
+    # ===== Style helpers =====
+    def font(name: str, size: float):
+        c.setFont(name, size)
+
+    def text(x, y, s, name="NotoSansKR", size=10, color=colors.black):
+        c.setFillColor(color)
+        font(name, size)
+        c.drawString(x, y, s)
+
+    def text_r(x, y, s, name="NotoSansKR", size=10, color=colors.black):
+        c.setFillColor(color)
+        font(name, size)
+        c.drawRightString(x, y, s)
+
+    def line(xa, ya, xb, yb, w=0.6, color=colors.HexColor("#E5E7EB")):
+        c.setStrokeColor(color)
+        c.setLineWidth(w)
+        c.line(xa, ya, xb, yb)
+
+    def round_box(x, y, w, h, r=4*mm, stroke=colors.HexColor("#E5E7EB"), fill=None, lw=0.8):
+        c.setLineWidth(lw)
+        c.setStrokeColor(stroke)
+        if fill is None:
+            c.setFillColor(colors.white)
+            c.roundRect(x, y, w, h, r, stroke=1, fill=0)
+        else:
+            c.setFillColor(fill)
+            c.roundRect(x, y, w, h, r, stroke=1, fill=1)
+
+    def wrap_lines(s: str, max_width: float, font_name: str, font_size: float):
+        """
+        Robust-ish wrapping using ReportLab stringWidth.
+        """
+        font(font_name, font_size)
+        words = list(s.strip().split())
+        if not words:
+            return [""]
+
         lines = []
-        s = text.strip()
-        while s:
-            chunk = s[:approx_chars]
-            # try break at last space
-            cut = chunk.rfind(" ")
-            if cut > 20 and len(s) > approx_chars:
-                chunk = chunk[:cut]
-            lines.append(chunk)
-            s = s[len(chunk):].lstrip()
-        for line in lines:
-            c.drawString(x, y, line)
+        cur = words[0]
+        for w in words[1:]:
+            cand = cur + " " + w
+            if c.stringWidth(cand, font_name, font_size) <= max_width:
+                cur = cand
+            else:
+                lines.append(cur)
+                cur = w
+        lines.append(cur)
+        return lines
+
+    def draw_paragraph(x: float, y: float, s: str, max_width: float, font_name="NotoSansKR", font_size=9.5, leading=13):
+        lines = wrap_lines(s, max_width, font_name, font_size)
+        c.setFillColor(colors.black)
+        font(font_name, font_size)
+        for ln in lines:
+            c.drawString(x, y, ln)
             y -= leading
         return y
 
+    def draw_bullets(x: float, y: float, items, max_width: float, bullet="•", font_size=9.5, leading=13):
+        for it in items:
+            # Render bullet + wrapped continuation lines
+            lines = wrap_lines(str(it).strip(), max_width - 8*mm, "NotoSansKR", font_size)
+            font("NotoSansKR", font_size)
+            c.setFillColor(colors.black)
+            c.drawString(x, y, f"{bullet}")
+            c.drawString(x + 4*mm, y, lines[0])
+            y -= leading
+            for ln in lines[1:]:
+                c.drawString(x + 4*mm, y, ln)
+                y -= leading
+        return y
+
+    def clamp_two_lines(s: str, max_width: float, font_size: float):
+        """
+        Keep at most 2 wrapped lines; add ellipsis if overflow.
+        """
+        lines = wrap_lines(s, max_width, "NotoSansKR", font_size)
+        if len(lines) <= 2:
+            return lines
+
+        # Need ellipsis on second line
+        l1 = lines[0]
+        l2 = lines[1]
+        ell = "…"
+        # shrink l2 until fits with ellipsis
+        font("NotoSansKR", font_size)
+        while c.stringWidth(l2 + ell, "NotoSansKR", font_size) > max_width and len(l2) > 1:
+            l2 = l2[:-1]
+        return [l1, l2 + ell]
+
+    # ===== Context =====
     customer = context["customer"]
     segment = context["segment"]
     stats = context["stats"]
     planner = context["planner"]
     footer = context["footer"]
-    structure_rows = context.get("structure_rows", [])
 
-    # Header
-    draw_text(left, y, context.get("brand_name", "미래에셋금융서비스"), size=11, bold=True)
-    draw_text(left, y - 6 * mm, context.get("brand_subtitle", "Coverage Snapshot Report (Pre-Analysis)"), size=9)
-    draw_text(right - 70 * mm, y, "Coverage Snapshot Report", size=12, bold=True)
-    draw_text(right - 70 * mm, y - 6 * mm, f"{customer['age_band']} · {customer['gender']}", size=9)
-    y -= 14 * mm
-    c.line(left, y, right, y)
-    y -= 10 * mm
+    # Ensure phone is formatted
+    planner_phone = _format_phone(planner.get("phone", ""))
 
-    # Title block
-    draw_text(left, y, f"{customer['name']} 고객님을 위한 보장 점검 안내", size=14, bold=True)
-    y -= 8 * mm
-    draw_text(left, y, f"기준연도 {stats.get('base_year','')} · {stats.get('source','')} · v{context.get('version','')}", size=8)
-    y -= 10 * mm
+    # ===== Start drawing =====
+    y = H - M_T
 
-    # Summary
-    draw_text(left, y, "요약", size=11, bold=True)
+    # Header bar (brand left, meta right)
+    text(X0, y, context.get("brand_name", "미래에셋금융서비스"), name="NotoSansKR-Bold", size=11)
+    text(X0, y - 5*mm, context.get("brand_subtitle", "Coverage Snapshot (Pre-Analysis)"), size=9, color=colors.HexColor("#6B7280"))
+
+    meta = f"v{context.get('version','')}"
+    text_r(X1, y, meta, size=9, color=colors.HexColor("#6B7280"))
+    y -= 12 * mm
+    line(X0, y, X1, y)
+
+    # Title block (centered feel via left start but strong hierarchy)
+    y -= GAP_SECTION_TOP
+    text(X0, y, "보장 점검 안내", name="NotoSansKR-Bold", size=18)
     y -= 7 * mm
-    for line in segment.get("summary_lines", [])[:3]:
-        y = draw_wrapped(left + 4 * mm, y, f"• {line}", max_width=(right - left - 6 * mm), size=9, leading=12)
-    y -= 4 * mm
+    sub = f"{customer['name']} 고객님 · {customer['age_band']} · {customer['gender']}"
+    text(X0, y, sub, name="NotoSansKR-Bold", size=11, color=colors.HexColor("#111827"))
+    y -= 5 * mm
+    small = f"기준연도 {stats.get('base_year','')} | {stats.get('source','')} | {context.get('brand_name','')}"
+    text(X0, y, small, size=8.5, color=colors.HexColor("#6B7280"))
 
-    # Stats cards (simple boxed rows)
-    draw_text(left, y, "현황 통계 예시", size=11, bold=True)
-    y -= 7 * mm
+    y -= GAP_SECTION_BOTTOM
 
-    cards = stats.get("cards", [])
-    box_w = (right - left - 6 * mm) / 3
-    box_h = 28 * mm
-    x0 = left
-    y0 = y - box_h
+    # === Section: 요약 ===
+    y -= GAP_SECTION_TOP
+    text(X0, y, "요약", name="NotoSansKR-Bold", size=12)
+    y -= GAP_TITLE_BOTTOM
+    y = draw_bullets(X0, y - 2*mm, segment.get("summary_lines", [])[:3], max_width=CW, font_size=9.8, leading=13)
+    y -= GAP_SECTION_BOTTOM
 
-    for i, card in enumerate(cards[:3]):
-        x = x0 + i * (box_w + 3 * mm)
-        c.roundRect(x, y0, box_w, box_h, 4 * mm, stroke=1, fill=0)
-        c.setFont("NotoSansKR", 9)
-        c.drawString(x + 3 * mm, y0 + box_h - 7 * mm, card.get("title", ""))
-        c.setFont("NotoSansKR", 8.5)
-        _y = y0 + box_h - 13 * mm
-        _y = draw_wrapped(x + 3 * mm, _y, card.get("value", ""), max_width=(box_w - 6 * mm), size=8.5, leading=11)
+    # === Section: 현황 통계 예시 (3 cards) ===
+    y -= GAP_SECTION_TOP
+    text(X0, y, "현황 통계 예시", name="NotoSansKR-Bold", size=12)
+    y -= GAP_TITLE_BOTTOM
 
-    y = y0 - 10 * mm
+    cards = stats.get("cards", [])[:3]
+    card_gap = 4 * mm
+    card_w = (CW - 2 * card_gap) / 3
+    card_h = 30 * mm  # fixed height for consistent aesthetics
 
-    # Gap questions
-    draw_text(left, y, "점검 질문", size=11, bold=True)
-    y -= 7 * mm
-    for idx, q in enumerate(segment.get("gap_questions", [])[:2], start=1):
-        y = draw_wrapped(left + 4 * mm, y, f"{idx}. {q}", max_width=(right - left - 6 * mm), size=9, leading=12)
-    y -= 4 * mm
+    y_cards_top = y - 2*mm
+    y_cards_bottom = y_cards_top - card_h
 
-    # Structure table (2 columns)
-    draw_text(left, y, "필요 보장 구조(개요)", size=11, bold=True)
-    y -= 7 * mm
+    for i, card in enumerate(cards):
+        x = X0 + i * (card_w + card_gap)
+        round_box(x, y_cards_bottom, card_w, card_h, r=4*mm, stroke=colors.HexColor("#E5E7EB"), fill=colors.HexColor("#F9FAFB"))
+        # title
+        text(x + 3*mm, y_cards_top - 8*mm, str(card.get("title","")), name="NotoSansKR-Bold", size=9, color=colors.HexColor("#374151"))
+        # value (max 2 lines + ellipsis)
+        v = str(card.get("value","")).strip()
+        lines2 = clamp_two_lines(v, max_width=card_w - 6*mm, font_size=9.2)
+        yy = y_cards_top - 15*mm
+        for ln in lines2:
+            text(x + 3*mm, yy, ln, size=9.2, color=colors.HexColor("#111827"))
+            yy -= 5.2*mm
 
-    col1 = left
-    col2 = left + 35 * mm
-    c.rect(left, y - 22 * mm, right - left, 22 * mm, stroke=1, fill=0)
-    c.line(col2, y, col2, y - 22 * mm)
+    y = y_cards_bottom - 6*mm
+    text(X0, y, "* 동일 연령·성별 집단의 통계 기반 요약이며, 개인별 상황에 따라 달라질 수 있습니다.", size=8.2, color=colors.HexColor("#6B7280"))
+    y -= GAP_SECTION_BOTTOM
 
-    c.setFont("NotoSansKR", 9)
-    c.drawString(col1 + 3 * mm, y - 6 * mm, "보장 영역")
-    c.drawString(col2 + 3 * mm, y - 6 * mm, "점검이 필요한 이유")
-    c.line(left, y - 8 * mm, right, y - 8 * mm)
+    # === Section: 점검 질문 ===
+    y -= GAP_SECTION_TOP
+    text(X0, y, "점검 질문", name="NotoSansKR-Bold", size=12)
+    y -= GAP_TITLE_BOTTOM
 
-    c.setFont("NotoSansKR", 8.5)
-    row_y = y - 14 * mm
-    for r in structure_rows[:3]:
-        c.drawString(col1 + 3 * mm, row_y, str(r.get("area", "")))
-        draw_wrapped(col2 + 3 * mm, row_y, str(r.get("reason", "")), max_width=(right - col2 - 6 * mm), size=8.5, leading=11)
-        row_y -= 7 * mm
+    qs = segment.get("gap_questions", [])[:2]
+    for idx, q in enumerate(qs, start=1):
+        q_lines = wrap_lines(f"{idx}. {q}", CW, "NotoSansKR", 9.8)
+        for ln in q_lines:
+            text(X0, y - 2*mm, ln, size=9.8)
+            y -= 5.5*mm
+        y -= 2*mm
 
-    y = (y - 22 * mm) - 8 * mm
+    y -= GAP_SECTION_BOTTOM
 
-    # CTA box
-    c.roundRect(left, y - 18 * mm, right - left, 18 * mm, 4 * mm, stroke=1, fill=0)
-    c.setFont("NotoSansKR", 10)
-    c.drawString(left + 3 * mm, y - 6 * mm, "확인하고 싶으시면, 한 번에 점검해보시죠.")
-    c.setFont("NotoSansKR", 8.8)
-    draw_wrapped(left + 3 * mm, y - 12 * mm, segment.get("cta", ""), max_width=(right - left - 6 * mm), size=8.8, leading=11)
-    y -= 24 * mm
+    # === Section: 필요 보장 구조(개요) ===
+    y -= GAP_SECTION_TOP
+    text(X0, y, "필요 보장 구조(개요)", name="NotoSansKR-Bold", size=12)
+    y -= GAP_TITLE_BOTTOM
 
-    # Planner box
-    c.roundRect(left, y - 18 * mm, right - left, 18 * mm, 4 * mm, stroke=1, fill=0)
-    c.setFont("NotoSansKR", 9)
-    c.drawString(left + 3 * mm, y - 6 * mm, "상담 및 보장 점검 문의")
-    c.setFont("NotoSansKR", 9)
-    c.drawString(left + 3 * mm, y - 12 * mm, f"{planner.get('name','')} 컨설턴트 | 전화: {planner.get('phone','')}")
+    # Table box
+    table_h = 28 * mm
+    y_table_top = y - 2*mm
+    y_table_bottom = y_table_top - table_h
+
+    # outer
+    round_box(X0, y_table_bottom, CW, table_h, r=4*mm, stroke=colors.HexColor("#E5E7EB"), fill=colors.white)
+
+    # header shading
+    header_h = 8 * mm
+    c.setFillColor(colors.HexColor("#F3F4F6"))
+    c.setStrokeColor(colors.HexColor("#E5E7EB"))
+    c.rect(X0, y_table_top - header_h, CW, header_h, stroke=0, fill=1)
+
+    col1_w = 34 * mm
+    # column divider + header divider
+    line(X0 + col1_w, y_table_bottom, X0 + col1_w, y_table_top, w=0.6)
+    line(X0, y_table_top - header_h, X1, y_table_top - header_h, w=0.6)
+
+    text(X0 + 3*mm, y_table_top - 6*mm, "보장 영역", name="NotoSansKR-Bold", size=9, color=colors.HexColor("#374151"))
+    text(X0 + col1_w + 3*mm, y_table_top - 6*mm, "점검이 필요한 이유", name="NotoSansKR-Bold", size=9, color=colors.HexColor("#374151"))
+
+    # rows
+    rows = context.get("structure_rows", [])[:3]
+    row_y = y_table_top - header_h - 6*mm
+    row_gap = 6.5 * mm
+    for r in rows:
+        text(X0 + 3*mm, row_y, str(r.get("area","")), name="NotoSansKR-Bold", size=9.2, color=colors.HexColor("#111827"))
+        # reason single-line clamp for neatness
+        reason = str(r.get("reason","")).strip()
+        reason_lines = clamp_two_lines(reason, max_width=CW - col1_w - 6*mm, font_size=9.0)
+        rr_y = row_y
+        for ln in reason_lines[:1]:  # keep it 1 line for table cleanliness
+            text(X0 + col1_w + 3*mm, rr_y, ln, size=9.0, color=colors.HexColor("#111827"))
+        row_y -= row_gap
+
+    y = y_table_bottom - GAP_SECTION_BOTTOM
+
+    # === CTA box ===
+    y -= GAP_SECTION_TOP
+    round_box(X0, y - 22*mm, CW, 22*mm, r=5*mm, stroke=colors.HexColor("#E5E7EB"), fill=colors.white)
+    text(X0 + 4*mm, y - 7*mm, "상세 보장분석 리포트를 받아보고 싶으신가요?", name="NotoSansKR-Bold", size=11)
+    cta = str(segment.get("cta","")).strip()
+    # limit to 2 lines for aesthetics
+    cta_lines = clamp_two_lines(cta, max_width=CW - 8*mm, font_size=9.2)
+    yy = y - 13*mm
+    for ln in cta_lines:
+        text(X0 + 4*mm, yy, ln, size=9.2, color=colors.HexColor("#111827"))
+        yy -= 5.2*mm
+    y = y - 26*mm
+
+    # === Planner box ===
+    round_box(X0, y - 18*mm, CW, 18*mm, r=5*mm, stroke=colors.HexColor("#E5E7EB"), fill=colors.HexColor("#F9FAFB"))
+    text(X0 + 4*mm, y - 6.5*mm, "상담 및 보장 점검 문의", name="NotoSansKR-Bold", size=9.5, color=colors.HexColor("#374151"))
+    text(X0 + 4*mm, y - 12.5*mm, f"{planner.get('name','')} 컨설턴트", name="NotoSansKR-Bold", size=10.5)
+    text_r(X1 - 4*mm, y - 12.5*mm, f"전화: {planner_phone}", name="NotoSansKR", size=9.8, color=colors.HexColor("#111827"))
     if planner.get("email"):
-        c.setFont("NotoSansKR", 8.5)
-        c.drawString(left + 3 * mm, y - 16 * mm, f"이메일: {planner.get('email')}")
-    y -= 26 * mm
+        text(X0 + 4*mm, y - 16.8*mm, f"이메일: {planner.get('email')}", size=8.7, color=colors.HexColor("#6B7280"))
 
-    # Footer disclaimer
-    c.setFont("NotoSansKR", 7.5)
-    y = draw_wrapped(left, 16 * mm + 10, footer.get("disclaimer", ""), max_width=(right - left), size=7.5, leading=10)
-    c.setFont("NotoSansKR", 7.5)
-    c.drawString(left, 12 * mm, footer.get("legal_note", ""))
+    # === Footer disclaimer ===
+    # keep at bottom margin area
+    foot_y = M_B + 18*mm
+    c.setFillColor(colors.HexColor("#6B7280"))
+    font("NotoSansKR", 7.8)
+    # wrap disclaimer in 2~3 lines
+    disc_lines = wrap_lines(str(footer.get("disclaimer","")).strip(), CW, "NotoSansKR", 7.8)
+    disc_lines = disc_lines[:3]
+    yy = foot_y
+    for ln in disc_lines:
+        c.drawString(X0, yy, ln)
+        yy -= 10
+    font("NotoSansKR", 7.8)
+    c.drawString(X0, M_B + 8, str(footer.get("legal_note","")).strip())
 
     c.showPage()
     c.save()
