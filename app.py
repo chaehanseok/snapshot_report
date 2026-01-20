@@ -39,7 +39,7 @@ SECRET = st.secrets.get("GATEWAY_SECRET", "")
 BASE_DIR = Path(__file__).parent
 FONT_PATH = BASE_DIR / "templates" / "assets" / "fonts" / "NotoSansKR-Regular.ttf"
 
-def register_korean_font():
+def register_korean_fonts():
     if "NotoSansKR" not in pdfmetrics.getRegisteredFontNames():
         pdfmetrics.registerFont(
             TTFont("NotoSansKR", str(FONT_PATH))
