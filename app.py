@@ -294,7 +294,13 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
 
     planner_name = planner.get("name", "")
     planner_phone = format_phone_3_4_4(planner.get("phone", ""))
+    planner_email = planner.get("email", "")
     planner_org = org_display(BRAND_NAME, planner.get("org", ""))
+    org_raw = planner.get("org", "").strip()
+    if org_raw:
+        org_display = f"미래에셋금융서비스 · {org_raw}"
+    else:
+        org_display = "미래에셋금융서비스"
 
     # ===== Start drawing =====
     y = H - M_T
@@ -421,6 +427,8 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
 
     y = y - (cta_h + 6*mm)
 
+
+
     # Planner box (요구 포맷 반영)
     planner_h = 22 * mm
     round_box(X0, y - planner_h, CW, planner_h, r=7*mm, stroke=GRAY_200, fill=GRAY_50, lw=0.9)
@@ -428,10 +436,17 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
     text(X0 + 5*mm, y - 7*mm, "상담 및 보장 점검 문의", size=9.4, bold=True, color=GRAY_700)
 
     text(X0 + 5*mm, y - 13*mm, f"FC명 : {planner_name}", size=10.5, bold=True, color=MA_BLUE)
-    text_r(X1 - 5*mm, y - 13*mm, f"연락처 : {planner_phone}", size=9.6, color=GRAY_700)
 
     # 소속: 미래에셋금융서비스 · {org}
     text(X0 + 5*mm, y - 18.5*mm, f"소속 : {planner_org}", size=9.0, color=GRAY_500)
+    
+    text_r(X1 - 5*mm, y - 13*mm, f"연락처 : {planner_phone}", size=9.6, color=GRAY_700)
+    # 이메일 (있을 때만)
+    if planner_email:
+        text(X0 + 5*mm, y - 22.5*mm,
+            f"이메일 : {planner_email}",
+            size=8.6, color=GRAY_500)
+
 
     # Footer disclaimer
     foot_y = M_B + 18*mm
