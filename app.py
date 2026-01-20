@@ -10,6 +10,8 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 # ----------------------------
 # Config
@@ -32,6 +34,15 @@ LOGO_PATH = TEMPLATES_DIR / "assets" / "logo.png"
 
 # HMAC secret for gateway token validation
 SECRET = st.secrets.get("GATEWAY_SECRET", "")
+
+BASE_DIR = Path(__file__).parent
+FONT_PATH = BASE_DIR / "templates" / "assets" / "fonts" / "NotoSansKR-Regular.ttf"
+
+def register_korean_font():
+    if "NotoSansKR" not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(
+            TTFont("NotoSansKR", str(FONT_PATH))
+        )
 
 # ----------------------------
 # Token helpers
@@ -117,6 +128,8 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
     Coverage Snapshot Report (single page) generated via ReportLab.
     Uses the already-prepared context values (customer/segment/stats/planner/footer).
     """
+
+    register_korean_font()
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     width, height = A4
@@ -127,12 +140,12 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
     y = height - 16 * mm
 
     def draw_text(x, y, text, size=10, bold=False):
-        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+        c.setFont("NotoSansKR", size)
         c.drawString(x, y, text)
 
     def draw_wrapped(x, y, text, max_width, size=10, leading=14):
         # very simple wrap by character count approximation (sufficient for MVP)
-        c.setFont("Helvetica", size)
+        c.setFont("NotoSansKR", size)
         # heuristic: average glyph width ~0.5*size points; convert max_width points to char count
         approx_chars = max(12, int(max_width / (size * 0.55)))
         lines = []
@@ -192,9 +205,9 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
     for i, card in enumerate(cards[:3]):
         x = x0 + i * (box_w + 3 * mm)
         c.roundRect(x, y0, box_w, box_h, 4 * mm, stroke=1, fill=0)
-        c.setFont("Helvetica-Bold", 9)
+        c.setFont("NotoSansKR", 9)
         c.drawString(x + 3 * mm, y0 + box_h - 7 * mm, card.get("title", ""))
-        c.setFont("Helvetica", 8.5)
+        c.setFont("NotoSansKR", 8.5)
         _y = y0 + box_h - 13 * mm
         _y = draw_wrapped(x + 3 * mm, _y, card.get("value", ""), max_width=(box_w - 6 * mm), size=8.5, leading=11)
 
@@ -216,12 +229,12 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
     c.rect(left, y - 22 * mm, right - left, 22 * mm, stroke=1, fill=0)
     c.line(col2, y, col2, y - 22 * mm)
 
-    c.setFont("Helvetica-Bold", 9)
+    c.setFont("NotoSansKR", 9)
     c.drawString(col1 + 3 * mm, y - 6 * mm, "보장 영역")
     c.drawString(col2 + 3 * mm, y - 6 * mm, "점검이 필요한 이유")
     c.line(left, y - 8 * mm, right, y - 8 * mm)
 
-    c.setFont("Helvetica", 8.5)
+    c.setFont("NotoSansKR", 8.5)
     row_y = y - 14 * mm
     for r in structure_rows[:3]:
         c.drawString(col1 + 3 * mm, row_y, str(r.get("area", "")))
@@ -232,27 +245,27 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
 
     # CTA box
     c.roundRect(left, y - 18 * mm, right - left, 18 * mm, 4 * mm, stroke=1, fill=0)
-    c.setFont("Helvetica-Bold", 10)
+    c.setFont("NotoSansKR", 10)
     c.drawString(left + 3 * mm, y - 6 * mm, "확인하고 싶으시면, 한 번에 점검해보시죠.")
-    c.setFont("Helvetica", 8.8)
+    c.setFont("NotoSansKR", 8.8)
     draw_wrapped(left + 3 * mm, y - 12 * mm, segment.get("cta", ""), max_width=(right - left - 6 * mm), size=8.8, leading=11)
     y -= 24 * mm
 
     # Planner box
     c.roundRect(left, y - 18 * mm, right - left, 18 * mm, 4 * mm, stroke=1, fill=0)
-    c.setFont("Helvetica-Bold", 9)
+    c.setFont("NotoSansKR", 9)
     c.drawString(left + 3 * mm, y - 6 * mm, "상담 및 보장 점검 문의")
-    c.setFont("Helvetica", 9)
+    c.setFont("NotoSansKR", 9)
     c.drawString(left + 3 * mm, y - 12 * mm, f"{planner.get('name','')} 컨설턴트 | 전화: {planner.get('phone','')}")
     if planner.get("email"):
-        c.setFont("Helvetica", 8.5)
+        c.setFont("NotoSansKR", 8.5)
         c.drawString(left + 3 * mm, y - 16 * mm, f"이메일: {planner.get('email')}")
     y -= 26 * mm
 
     # Footer disclaimer
-    c.setFont("Helvetica", 7.5)
+    c.setFont("NotoSansKR", 7.5)
     y = draw_wrapped(left, 16 * mm + 10, footer.get("disclaimer", ""), max_width=(right - left), size=7.5, leading=10)
-    c.setFont("Helvetica", 7.5)
+    c.setFont("NotoSansKR", 7.5)
     c.drawString(left, 12 * mm, footer.get("legal_note", ""))
 
     c.showPage()
