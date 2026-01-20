@@ -225,7 +225,7 @@ html, body{
   background: var(--card);
 }
 .planner-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--muted);
   margin-bottom: 6px;
@@ -238,18 +238,18 @@ html, body{
 }
 
 .planner-org {
-  font-size: 12.5px;
+  font-size: 12px;
   color: #374151;
   margin-bottom: 6px;
 }
 .planner-phone {
-  font-size: 12.5px;
+  font-size: 12px;
   color: #374151;
   margin-bottom: 2px;
 }
 
 .planner-email {
-  font-size: 11px;          /* 👈 작게 */
+  font-size: 12px;          /* 👈 작게 */
   color: #6B7280;           /* 연한 회색 */
 }
 
