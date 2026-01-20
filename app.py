@@ -97,7 +97,7 @@ def verify_token(token: str) -> Dict[str, Any]:
         raise ValueError("Missing planner fields")
 
     phone_digits = re.sub(r"\D", "", phone)
-    org = str(payload.get("org", "")).strip()  # <-- 토큰에 org 넣으면 여기서 자동 수신
+    org = str(payload.get("org", "")).strip()
 
     return {
         "name": name,
@@ -184,10 +184,13 @@ def html_to_pdf_bytes(html: str, css_file: Path) -> bytes:
 def reportlab_snapshot_pdf(context: dict) -> bytes:
     """
     Coverage Snapshot Report (1-page) via ReportLab.
-    - 기존 기능 유지 (토큰 검증/미리보기/확정/PDF 다운로드)
-    - Mirae Asset 컬러(Blue/Orange) 적용
-    - 1장 깔끔한 마진/간격 적용
-    - 설계사 표기: FC명 : / 소속 : 미래에셋금융서비스 · {org} / 연락처 : 010-1234-5678
+    - 기존 기능 유지
+    - 설계사 박스 표기:
+      상담 및 보장 점검 문의
+      {이름} 컨설턴트
+      소속 : 미래에셋금융서비스 · {org}
+      연락처 : 010-1234-5678
+      이메일 : xxxx@miraeasset.com  (있을 때만)
     """
     register_korean_fonts()
 
@@ -294,13 +297,10 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
 
     planner_name = planner.get("name", "")
     planner_phone = format_phone_3_4_4(planner.get("phone", ""))
-    planner_email = planner.get("email", "")
-    planner_org = org_display(BRAND_NAME, planner.get("org", ""))
-    org_raw = planner.get("org", "").strip()
-    if org_raw:
-        org_display = f"미래에셋금융서비스 · {org_raw}"
-    else:
-        org_display = "미래에셋금융서비스"
+    planner_email = (planner.get("email") or "").strip()
+
+    # ✅ 여기서 "표시용 소속 문자열"만 만들고, 변수명은 org_display로 쓰지 않는다
+    planner_org_text = org_display(BRAND_NAME, planner.get("org", ""))
 
     # ===== Start drawing =====
     y = H - M_T
@@ -427,26 +427,24 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
 
     y = y - (cta_h + 6*mm)
 
-
-
-    # Planner box (요구 포맷 반영)
-    planner_h = 22 * mm
+    # Planner box (요구 포맷 반영: 컨설턴트/소속/연락처/이메일)
+    planner_h = 26 * mm
     round_box(X0, y - planner_h, CW, planner_h, r=7*mm, stroke=GRAY_200, fill=GRAY_50, lw=0.9)
 
     text(X0 + 5*mm, y - 7*mm, "상담 및 보장 점검 문의", size=9.4, bold=True, color=GRAY_700)
 
-    text(X0 + 5*mm, y - 13*mm, f"FC명 : {planner_name}", size=10.5, bold=True, color=MA_BLUE)
+    # 이름: "{이름} 컨설턴트"
+    text(X0 + 5*mm, y - 13*mm, f"{planner_name} 컨설턴트", size=10.5, bold=True, color=MA_BLUE)
 
-    # 소속: 미래에셋금융서비스 · {org}
-    text(X0 + 5*mm, y - 18.5*mm, f"소속 : {planner_org}", size=9.0, color=GRAY_500)
-    
-    text_r(X1 - 5*mm, y - 13*mm, f"연락처 : {planner_phone}", size=9.6, color=GRAY_700)
-    # 이메일 (있을 때만)
+    # 소속: "소속 : 미래에셋금융서비스 · {org}"
+    text(X0 + 5*mm, y - 18*mm, f"소속 : {planner_org_text}", size=9.2, color=GRAY_700)
+
+    # 연락처: 오른쪽 정렬 + 3-4-4
+    text_r(X1 - 5*mm, y - 18*mm, f"연락처 : {planner_phone}", size=9.2, color=GRAY_700)
+
+    # 이메일: 있으면 표시
     if planner_email:
-        text(X0 + 5*mm, y - 22.5*mm,
-            f"이메일 : {planner_email}",
-            size=8.6, color=GRAY_500)
-
+        text(X0 + 5*mm, y - 22.8*mm, f"이메일 : {planner_email}", size=8.6, color=GRAY_500)
 
     # Footer disclaimer
     foot_y = M_B + 18*mm
@@ -474,13 +472,11 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
 # ----------------------------
 st.set_page_config(page_title="보장 점검 유인 팜플렛", layout="centered")
 
-# Read token
 token = st.query_params.get("token")
 if not token:
     st.error("유효한 접속 정보가 없습니다. M.POST 게이트웨이 링크로 접속해 주세요.")
     st.stop()
 
-# Verify planner
 try:
     planner = verify_token(token)
 except Exception as e:
@@ -490,7 +486,6 @@ except Exception as e:
 segments_db = load_json(SEGMENTS_PATH)
 stats_db = load_json(STATS_PATH)
 
-# Display planner info (요구 포맷)
 planner_org_display = org_display(BRAND_NAME, planner.get("org", ""))
 
 st.success("설계사 인증 완료")
@@ -499,12 +494,10 @@ st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{format_phone_3_4_4(planner['phone'])}**")
 st.divider()
 
-# Customer input
 customer_name = st.text_input("고객 성명", value="")
 gender = st.selectbox("성별", ["남성", "여성"])
 age_band = st.selectbox("연령대", ["20대", "30대", "40대", "50대", "60대 이상"])
 
-# Build key and load segment/cards
 key = segment_key(age_band, gender)
 
 segment = segments_db["segments"].get(key)
@@ -514,7 +507,6 @@ if not segment or not cards:
     st.error(f"콘텐츠 세트가 없습니다: {key}")
     st.stop()
 
-# Controlled adjustments
 st.subheader("문구 조정(선택/제한)")
 summary_lines = segment["summary_lines"][:]
 gap_questions = segment["gap_questions"][:]
@@ -529,14 +521,12 @@ gap_questions[1] = st.text_input("점검 질문 2", value=gap_questions[1])
 
 cta_text = st.text_area("CTA 문구", value=cta_text, height=90)
 
-# Structure rows (고정)
 structure_rows = [
     {"area": "진단비", "reason": "진단 직후 초기 자금 여력(목돈) 점검"},
     {"area": "치료비", "reason": "치료 과정의 반복 비용·통원/수술 부담 점검"},
     {"area": "생활·소득", "reason": "치료로 인한 소득 공백·가계 영향 점검"},
 ]
 
-# Build context (기존 기능 유지 + planner/org 포함)
 context = {
     "css_path": str(CSS_PATH),
     "logo_data_uri": file_to_data_uri(LOGO_PATH),
@@ -554,7 +544,6 @@ context = {
         "email": planner.get("email", None),
         "org": planner.get("org", "").strip(),
         "company": BRAND_NAME,
-        # 템플릿에서 쓰기 쉽게 display 필드도 추가(기존 필드 유지)
         "phone_display": format_phone_3_4_4(planner["phone"]),
         "org_display": planner_org_display,
     },
@@ -574,17 +563,14 @@ context = {
         "disclaimer": "본 자료는 동일 연령·성별 집단의 통계 기반 참고 자료이며, 개인별 진단·보장 수준은 상이할 수 있습니다. 정확한 확인은 종합 보장분석을 통해 가능합니다.",
         "legal_note": "본 자료는 편의를 위해 제공되며 법적 효력을 갖지 않습니다."
     }),
-    # 템플릿/CSS 쪽에서 필요 시 사용할 수 있도록 컬러도 제공(기존 기능 영향 없음)
     "brand_colors": {
         "blue": "#043B72",
         "orange": "#F58220",
     }
 }
 
-# Render HTML
 html = render_html(context)
 
-# Inline CSS for Streamlit preview (so <link> isn't needed)
 css_text = CSS_PATH.read_text(encoding="utf-8")
 html_with_inline_css = html.replace(
     f'<link rel="stylesheet" href="{context["css_path"]}" />',
@@ -602,7 +588,6 @@ if st.button("확정 후 PDF 생성"):
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
 
-    # 컨텍스트에 고객명 확정 반영
     context["customer"]["name"] = customer_name.strip()
     context["segment"]["headline"] = segment["headline"].replace("{customer_name}", customer_name.strip())
 
