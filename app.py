@@ -6,6 +6,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from io import BytesIO
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
+
 # ----------------------------
 # Config
 # ----------------------------
@@ -106,6 +111,154 @@ def html_to_pdf_bytes(html: str, css_file: Path) -> bytes:
 
     # base_url is needed for relative asset loading
     return HTML(string=html, base_url=str(TEMPLATES_DIR)).write_pdf(stylesheets=[CSS(filename=str(css_file))])
+
+def reportlab_snapshot_pdf(context: dict) -> bytes:
+    """
+    Coverage Snapshot Report (single page) generated via ReportLab.
+    Uses the already-prepared context values (customer/segment/stats/planner/footer).
+    """
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    width, height = A4
+
+    # Margins
+    left = 14 * mm
+    right = width - 14 * mm
+    y = height - 16 * mm
+
+    def draw_text(x, y, text, size=10, bold=False):
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+        c.drawString(x, y, text)
+
+    def draw_wrapped(x, y, text, max_width, size=10, leading=14):
+        # very simple wrap by character count approximation (sufficient for MVP)
+        c.setFont("Helvetica", size)
+        # heuristic: average glyph width ~0.5*size points; convert max_width points to char count
+        approx_chars = max(12, int(max_width / (size * 0.55)))
+        lines = []
+        s = text.strip()
+        while s:
+            chunk = s[:approx_chars]
+            # try break at last space
+            cut = chunk.rfind(" ")
+            if cut > 20 and len(s) > approx_chars:
+                chunk = chunk[:cut]
+            lines.append(chunk)
+            s = s[len(chunk):].lstrip()
+        for line in lines:
+            c.drawString(x, y, line)
+            y -= leading
+        return y
+
+    customer = context["customer"]
+    segment = context["segment"]
+    stats = context["stats"]
+    planner = context["planner"]
+    footer = context["footer"]
+    structure_rows = context.get("structure_rows", [])
+
+    # Header
+    draw_text(left, y, context.get("brand_name", "미래에셋금융서비스"), size=11, bold=True)
+    draw_text(left, y - 6 * mm, context.get("brand_subtitle", "Coverage Snapshot Report (Pre-Analysis)"), size=9)
+    draw_text(right - 70 * mm, y, "Coverage Snapshot Report", size=12, bold=True)
+    draw_text(right - 70 * mm, y - 6 * mm, f"{customer['age_band']} · {customer['gender']}", size=9)
+    y -= 14 * mm
+    c.line(left, y, right, y)
+    y -= 10 * mm
+
+    # Title block
+    draw_text(left, y, f"{customer['name']} 고객님을 위한 보장 점검 안내", size=14, bold=True)
+    y -= 8 * mm
+    draw_text(left, y, f"기준연도 {stats.get('base_year','')} · {stats.get('source','')} · v{context.get('version','')}", size=8)
+    y -= 10 * mm
+
+    # Summary
+    draw_text(left, y, "요약", size=11, bold=True)
+    y -= 7 * mm
+    for line in segment.get("summary_lines", [])[:3]:
+        y = draw_wrapped(left + 4 * mm, y, f"• {line}", max_width=(right - left - 6 * mm), size=9, leading=12)
+    y -= 4 * mm
+
+    # Stats cards (simple boxed rows)
+    draw_text(left, y, "현황 통계 예시", size=11, bold=True)
+    y -= 7 * mm
+
+    cards = stats.get("cards", [])
+    box_w = (right - left - 6 * mm) / 3
+    box_h = 28 * mm
+    x0 = left
+    y0 = y - box_h
+
+    for i, card in enumerate(cards[:3]):
+        x = x0 + i * (box_w + 3 * mm)
+        c.roundRect(x, y0, box_w, box_h, 4 * mm, stroke=1, fill=0)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(x + 3 * mm, y0 + box_h - 7 * mm, card.get("title", ""))
+        c.setFont("Helvetica", 8.5)
+        _y = y0 + box_h - 13 * mm
+        _y = draw_wrapped(x + 3 * mm, _y, card.get("value", ""), max_width=(box_w - 6 * mm), size=8.5, leading=11)
+
+    y = y0 - 10 * mm
+
+    # Gap questions
+    draw_text(left, y, "점검 질문", size=11, bold=True)
+    y -= 7 * mm
+    for idx, q in enumerate(segment.get("gap_questions", [])[:2], start=1):
+        y = draw_wrapped(left + 4 * mm, y, f"{idx}. {q}", max_width=(right - left - 6 * mm), size=9, leading=12)
+    y -= 4 * mm
+
+    # Structure table (2 columns)
+    draw_text(left, y, "필요 보장 구조(개요)", size=11, bold=True)
+    y -= 7 * mm
+
+    col1 = left
+    col2 = left + 35 * mm
+    c.rect(left, y - 22 * mm, right - left, 22 * mm, stroke=1, fill=0)
+    c.line(col2, y, col2, y - 22 * mm)
+
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(col1 + 3 * mm, y - 6 * mm, "보장 영역")
+    c.drawString(col2 + 3 * mm, y - 6 * mm, "점검이 필요한 이유")
+    c.line(left, y - 8 * mm, right, y - 8 * mm)
+
+    c.setFont("Helvetica", 8.5)
+    row_y = y - 14 * mm
+    for r in structure_rows[:3]:
+        c.drawString(col1 + 3 * mm, row_y, str(r.get("area", "")))
+        draw_wrapped(col2 + 3 * mm, row_y, str(r.get("reason", "")), max_width=(right - col2 - 6 * mm), size=8.5, leading=11)
+        row_y -= 7 * mm
+
+    y = (y - 22 * mm) - 8 * mm
+
+    # CTA box
+    c.roundRect(left, y - 18 * mm, right - left, 18 * mm, 4 * mm, stroke=1, fill=0)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(left + 3 * mm, y - 6 * mm, "확인하고 싶으시면, 한 번에 점검해보시죠.")
+    c.setFont("Helvetica", 8.8)
+    draw_wrapped(left + 3 * mm, y - 12 * mm, segment.get("cta", ""), max_width=(right - left - 6 * mm), size=8.8, leading=11)
+    y -= 24 * mm
+
+    # Planner box
+    c.roundRect(left, y - 18 * mm, right - left, 18 * mm, 4 * mm, stroke=1, fill=0)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(left + 3 * mm, y - 6 * mm, "상담 및 보장 점검 문의")
+    c.setFont("Helvetica", 9)
+    c.drawString(left + 3 * mm, y - 12 * mm, f"{planner.get('name','')} 컨설턴트 | 전화: {planner.get('phone','')}")
+    if planner.get("email"):
+        c.setFont("Helvetica", 8.5)
+        c.drawString(left + 3 * mm, y - 16 * mm, f"이메일: {planner.get('email')}")
+    y -= 26 * mm
+
+    # Footer disclaimer
+    c.setFont("Helvetica", 7.5)
+    y = draw_wrapped(left, 16 * mm + 10, footer.get("disclaimer", ""), max_width=(right - left), size=7.5, leading=10)
+    c.setFont("Helvetica", 7.5)
+    c.drawString(left, 12 * mm, footer.get("legal_note", ""))
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return buf.read()
 
 # ----------------------------
 # Streamlit UI
@@ -230,14 +383,12 @@ if st.button("확정 후 PDF 생성"):
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
 
-    # Re-render with correct customer name guaranteed
+    # 컨텍스트에 고객명 확정 반영
     context["customer"]["name"] = customer_name.strip()
     context["segment"]["headline"] = segment["headline"].replace("{customer_name}", customer_name.strip())
 
-    html_final = render_html(context)
-
     try:
-        pdf_bytes = html_to_pdf_bytes(html_final, CSS_PATH)
+        pdf_bytes = reportlab_snapshot_pdf(context)
         filename = f"보장점검안내_{customer_name.strip()}_{age_band}_{gender}.pdf"
         st.download_button(
             "PDF 다운로드",
@@ -246,8 +397,5 @@ if st.button("확정 후 PDF 생성"):
             mime="application/pdf"
         )
     except Exception as e:
-        st.error(
-            "PDF 생성 모듈(WeasyPrint)이 설치되어 있지 않거나 환경 제약이 있습니다.\n\n"
-            f"오류: {e}\n\n"
-            "대안: WeasyPrint 설치 후 재시도하거나, ReportLab 방식으로 PDF 생성 로직을 사용하세요."
-        )
+        st.error(f"PDF 생성(ReportLab) 중 오류가 발생했습니다.\n\n오류: {e}")
+
