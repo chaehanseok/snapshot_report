@@ -486,9 +486,13 @@ except Exception as e:
 segments_db = load_json(SEGMENTS_PATH)
 stats_db = load_json(STATS_PATH)
 
-planner_org_display = org_display(BRAND_NAME, planner.get("org", ""))
+planner_org_display = (
+    f"{BRAND_NAME} · {planner.get('org').strip()}"
+    if planner.get("org")
+    else BRAND_NAME
+)
 
-st.success("설계사 인증 완료")
+st.success("미래에셋금융서비스 FC 인증 완료")
 st.write(f"FC명 : **{planner['name']}**")
 st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{format_phone_3_4_4(planner['phone'])}**")
@@ -539,13 +543,10 @@ context = {
         "age_band": age_band
     },
     "planner": {
-        "name": planner["name"],
-        "phone": planner["phone"],
-        "email": planner.get("email", None),
-        "org": planner.get("org", "").strip(),
-        "company": BRAND_NAME,
+        "name": f"{planner['name']} FC",
+        "org_display": planner_org_display,              # ← 회사 · 조직
         "phone_display": format_phone_3_4_4(planner["phone"]),
-        "org_display": planner_org_display,
+        "email": planner.get("email", None),
     },
     "segment": {
         "headline": segment["headline"].replace("{customer_name}", (customer_name.strip() or "고객")),
@@ -588,6 +589,7 @@ if st.button("확정 후 PDF 생성"):
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
 
+    # 컨텍스트에 고객명 확정 반영
     context["customer"]["name"] = customer_name.strip()
     context["segment"]["headline"] = segment["headline"].replace("{customer_name}", customer_name.strip())
 
@@ -595,16 +597,9 @@ if st.button("확정 후 PDF 생성"):
 
     try:
         pdf_bytes = html_to_pdf_bytes(html_final, CSS_PATH)
-
-        # (선택) PDF 미리보기: HTML과 완전히 동일한 결과 확인용
-        b64 = base64.b64encode(pdf_bytes).decode("utf-8")
-        components.html(
-            f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="980" style="border:none;"></iframe>',
-            height=980,
-            scrolling=True
-        )
-
         filename = f"보장점검안내_{customer_name.strip()}_{age_band}_{gender}.pdf"
+
+        st.success("PDF가 생성되었습니다. 아래 버튼으로 다운로드하세요.")
         st.download_button(
             "PDF 다운로드",
             data=pdf_bytes,
@@ -613,5 +608,6 @@ if st.button("확정 후 PDF 생성"):
         )
 
     except Exception as e:
-        st.error(f"PDF 생성(WeasyPrint) 오류: {e}")
+        st.error(f"PDF 생성(WeasyPrint) 중 오류가 발생했습니다.\n\n오류: {e}")
+
 

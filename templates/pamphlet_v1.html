@@ -100,12 +100,12 @@
     <section class="planner">
       <div class="planner__box">
         <div class="planner__label">상담 및 보장 점검 문의</div>
-        <div class="planner__name">{{ planner.name }} 컨설턴트</div>
-        <div class="planner__org">{{ planner.company }}</div>
-        <div class="planner__contacts">
-          <div>전화: {{ planner.phone }}</div>
-          {% if planner.email %}<div>이메일: {{ planner.email }}</div>{% endif %}
-        </div>
+        <div class="planner-name">{{ planner.name }}</div>
+        <div class="planner__org">{{ planner.org_display }}</div>
+        <div class="planner-phone">연락처 : {{ planner.phone_display }}</div>
+        {% if planner.email %}
+        <div class="planner-email">이메일 : {{ planner.email }}</div>
+        {% endif %}  
       </div>
     </section>
 
