@@ -231,7 +231,7 @@ html, body{
   margin-bottom: 6px;
 }
 .planner-name {
-  font-size: 15px;          /* 가장 큼 */
+  font-size: 16px;          /* 가장 큼 */
   font-weight: 700;
   color: #043B72;           /* Mirae Asset Blue */
   margin-bottom: 4px;
@@ -240,7 +240,7 @@ html, body{
 .planner-org {
   font-size: 12px;
   color: #374151;
-  margin-bottom: 6px;
+  margin-bottom: 2px;
 }
 .planner-phone {
   font-size: 12px;
@@ -250,7 +250,7 @@ html, body{
 
 .planner-email {
   font-size: 12px;          /* 👈 작게 */
-  color: #6B7280;           /* 연한 회색 */
+  color: #374151;
 }
 
 /* ===== Footer ===== */
