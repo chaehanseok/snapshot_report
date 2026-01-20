@@ -1,0 +1,8 @@
+app_description = """Coverage Snapshot
+
+A pre-analysis, age & gender-based coverage overview that helps customers
+recognize the need for a full Coverage Analysis.
+
+This app generates a personalized PDF snapshot (no product recommendation),
+and guides customers naturally to a comprehensive Coverage Analysis.
+"""

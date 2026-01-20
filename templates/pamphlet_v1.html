@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>보장 점검 안내</title>
+  <link rel="stylesheet" href="{{ css_path }}" />
+</head>
+
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand__logo">
+          <!-- 로고가 있으면 넣고, 없으면 숨김 처리 -->
+          {% if logo_data_uri %}
+            <img src="{{ logo_data_uri }}" alt="logo" />
+          {% else %}
+            <div class="brand__mark">M</div>
+          {% endif %}
+        </div>
+        <div class="brand__text">
+          <div class="brand__name">{{ brand_name }}</div>
+          <div class="brand__sub">{{ brand_subtitle }}</div>
+        </div>
+      </div>
+
+      <div class="docmeta">
+        <div class="docmeta__title">
+          {{ customer.name }} 고객님을 위한<br/>
+          <span class="docmeta__title--em">{{ customer.age_band }} · {{ customer.gender }}</span> 보장 점검 안내
+        </div>
+        <div class="docmeta__small">
+          기준연도 {{ stats.base_year }} · {{ stats.source }} · v{{ version }}
+        </div>
+      </div>
+    </header>
+
+    <!-- Intro -->
+    <section class="section">
+      <h2 class="section__title">요약</h2>
+      <ul class="bullets">
+        {% for line in segment.summary_lines %}
+          <li>{{ line }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <!-- Stat Cards -->
+    <section class="section">
+      <h2 class="section__title">현황 통계 예시</h2>
+      <div class="cards">
+        {% for card in stats.cards %}
+          <div class="card">
+            <div class="card__title">{{ card.title }}</div>
+            <div class="card__value">{{ card.value }}</div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="note">
+        * 위 내용은 동일 연령·성별 집단의 통계 기반 요약이며, 개인별 상황에 따라 달라질 수 있습니다.
+      </div>
+    </section>
+
+    <!-- Gap Questions -->
+    <section class="section">
+      <h2 class="section__title">점검 질문</h2>
+      <ol class="questions">
+        {% for q in segment.gap_questions %}
+          <li>{{ q }}</li>
+        {% endfor %}
+      </ol>
+    </section>
+
+    <!-- Structure -->
+    <section class="section">
+      <h2 class="section__title">필요 보장 구조(개요)</h2>
+      <div class="table">
+        <div class="row head">
+          <div class="cell col1">보장 영역</div>
+          <div class="cell col2">점검이 필요한 이유</div>
+        </div>
+        {% for r in structure_rows %}
+        <div class="row">
+          <div class="cell col1">{{ r.area }}</div>
+          <div class="cell col2">{{ r.reason }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+      <div class="cta__headline">확인하고 싶으시면, 한 번에 점검해보시죠.</div>
+      <div class="cta__body">{{ segment.cta }}</div>
+    </section>
+
+    <!-- Planner -->
+    <section class="planner">
+      <div class="planner__box">
+        <div class="planner__label">상담 및 보장 점검 문의</div>
+        <div class="planner__name">{{ planner.name }} 컨설턴트</div>
+        <div class="planner__org">{{ planner.company }}</div>
+        <div class="planner__contacts">
+          <div>전화: {{ planner.phone }}</div>
+          {% if planner.email %}<div>이메일: {{ planner.email }}</div>{% endif %}
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer__disclaimer">{{ footer.disclaimer }}</div>
+      <div class="footer__legal">{{ footer.legal_note }}</div>
+    </footer>
+  </div>
+</body>
+</html>
