@@ -36,8 +36,9 @@ LOGO_PATH = TEMPLATES_DIR / "assets" / "logo.png"
 # HMAC secret for gateway token validation
 SECRET = st.secrets.get("GATEWAY_SECRET", "")
 
-BASE_DIR = Path(__file__).parent
-FONT_PATH = BASE_DIR / "templates" / "assets" / "fonts" / "NotoSansKR-Regular.ttf"
+# ===== Path constants =====
+ASSETS_DIR = TEMPLATES_DIR / "assets"
+FONT_DIR = ASSETS_DIR / "fonts"
 
 def register_korean_fonts():
     # NOTE: 반드시 "BASE_DIR / templates / assets / fonts" 구조여야 함
