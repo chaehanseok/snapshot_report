@@ -40,10 +40,18 @@ BASE_DIR = Path(__file__).parent
 FONT_PATH = BASE_DIR / "templates" / "assets" / "fonts" / "NotoSansKR-Regular.ttf"
 
 def register_korean_fonts():
-    if "NotoSansKR" not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(
-            TTFont("NotoSansKR", str(FONT_PATH))
-        )
+    # NOTE: 반드시 "BASE_DIR / templates / assets / fonts" 구조여야 함
+    regular = FONT_DIR / "NotoSansKR-Regular.ttf"
+    bold = FONT_DIR / "NotoSansKR-Bold.ttf"
+
+    names = set(pdfmetrics.getRegisteredFontNames())
+
+    if "NotoSansKR" not in names:
+        pdfmetrics.registerFont(TTFont("NotoSansKR", str(regular)))
+
+    # Bold는 있으면 등록 (없거나 등록 실패해도 앱이 죽지 않게 아래 2단계에서 fallback)
+    if bold.exists() and "NotoSansKR-Bold" not in names:
+        pdfmetrics.registerFont(TTFont("NotoSansKR-Bold", str(bold)))
 
 # ----------------------------
 # Token helpers
@@ -139,6 +147,11 @@ def reportlab_snapshot_pdf(context: dict) -> bytes:
     Design goals: typographic hierarchy, consistent spacing, tidy cards, light table styling.
     """
     register_korean_fonts()
+
+    def pick_font(is_bold: bool) -> str:
+        if is_bold and "NotoSansKR-Bold" in pdfmetrics.getRegisteredFontNames():
+            return "NotoSansKR-Bold"
+        return "NotoSansKR"
 
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
