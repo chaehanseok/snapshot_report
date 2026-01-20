@@ -591,8 +591,19 @@ if st.button("확정 후 PDF 생성"):
     context["customer"]["name"] = customer_name.strip()
     context["segment"]["headline"] = segment["headline"].replace("{customer_name}", customer_name.strip())
 
+    html_final = render_html(context)
+
     try:
-        pdf_bytes = reportlab_snapshot_pdf(context)
+        pdf_bytes = html_to_pdf_bytes(html_final, CSS_PATH)
+
+        # (선택) PDF 미리보기: HTML과 완전히 동일한 결과 확인용
+        b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+        components.html(
+            f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="980" style="border:none;"></iframe>',
+            height=980,
+            scrolling=True
+        )
+
         filename = f"보장점검안내_{customer_name.strip()}_{age_band}_{gender}.pdf"
         st.download_button(
             "PDF 다운로드",
@@ -600,5 +611,7 @@ if st.button("확정 후 PDF 생성"):
             file_name=filename,
             mime="application/pdf"
         )
+
     except Exception as e:
-        st.error(f"PDF 생성(ReportLab) 중 오류가 발생했습니다.\n\n오류: {e}")
+        st.error(f"PDF 생성(WeasyPrint) 오류: {e}")
+

@@ -1,3 +1,5 @@
 streamlit
 jinja2
 reportlab
+weasyprint==61.2
+pydyf==0.10.0
