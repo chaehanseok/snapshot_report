@@ -122,59 +122,40 @@
     const page = document.querySelector(".page");
     if (!viewport || !page) return;
 
-    function getScale() {
-      // viewport 안에서 A4 page를 "가로 기준으로"만 축소
-      const vw = viewport.clientWidth;
-      const pw = page.getBoundingClientRect().width; // transform 전 기준 폭
-      if (!pw) return 1;
-      return Math.min(1, vw / pw);
-    }
-
-    function fitAndReport() {
-      // 1) scale 적용
-      const scale = getScale();
-      page.style.transform = `scale(${scale})`;
-      page.style.transformOrigin = "top left";
-
-      // 2) viewport 높이 정확히 계산 (scrollHeight는 transform 반영 안 하는 경우가 있어 rect 사용)
-      //    getBoundingClientRect()는 transform 적용 후 크기를 반영함
-      const rect = page.getBoundingClientRect();
-      const targetH = Math.ceil(rect.height);
-
-      viewport.style.height = targetH + "px";
-
-      // 3) Streamlit iframe 높이를 컨텐츠에 맞춰 자동 조절 (빈 여백 제거 핵심)
+    function setFrameHeight(px) {
       try {
         window.parent.postMessage(
-          { type: "streamlit:setFrameHeight", height: targetH + 20 },
+          {
+            isStreamlitMessage: true,
+            type: "streamlit:setFrameHeight",
+            height: px
+          },
           "*"
         );
       } catch (e) {}
     }
 
-    // 레이아웃/폰트/이미지 로드로 높이 변하는 케이스까지 커버
-    const ro = new ResizeObserver(fitAndReport);
-    ro.observe(viewport);
-    ro.observe(page);
+    function fit() {
+      const vw = viewport.clientWidth;
+      const pw = page.scrollWidth;
+      const scale = Math.min(1, vw / pw);
 
-    window.addEventListener("load", fitAndReport);
-    window.addEventListener("resize", fitAndReport);
+      page.style.transform = `scale(${scale})`;
+      page.style.transformOrigin = "top left";
 
-    // 폰트 로딩 이후 재계산(폰트가 PDF/미리보기 느낌 차이 만들던 핵심 포인트)
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(fitAndReport).catch(() => {});
+      const h = Math.ceil(page.scrollHeight * scale);
+      viewport.style.height = h + "px";
+
+      // 핵심: iframe 자체 높이를 Streamlit에 요청
+      setFrameHeight(h + 20);
     }
 
-    // 이미지(로고) 로드 후에도 재계산
-    const imgs = page.querySelectorAll("img");
-    imgs.forEach(img => {
-      if (!img.complete) img.addEventListener("load", fitAndReport, { once: true });
-    });
-
-    // 최초 1회
-    fitAndReport();
+    new ResizeObserver(fit).observe(viewport);
+    window.addEventListener("load", fit);
+    fit();
   })();
   </script>
+
 
 </body>
 </html>
