@@ -18,9 +18,8 @@
           <strong>{{ customer.name }}</strong> 고객님을 위한<br/>
           {{ customer.age_band }} · {{ customer.gender }} 보장 점검 안내
         </div>
-        <div class="subtitle">
-          보험 가입 여부보다 “현재 기준 최소 구조”가 갖춰져 있는지 점검이 중요합니다.
-        </div>
+        <div class="subtitle">보험 가입 여부보다 “현재 기준 최소 구조”가 갖춰져 있는지 점검이 중요합니다.</div>
+        <div class="meta-inline">기준연도 {{ stats.base_year }} · {{ stats.source }} · v{{ version }}</div>
       </div>
 
       <div class="header-right">
@@ -29,7 +28,6 @@
             <img src="{{ logo_data_uri }}" alt="Mirae Asset logo" />
           {% endif %}
         </div>
-        <div class="meta">기준연도 {{ stats.base_year }} · {{ stats.source }} · v{{ version }}</div>
       </div>
     </header>
 
@@ -99,11 +97,20 @@
     <section class="planner">
       <div class="planner-box">
         <div class="planner-title">상담 및 보장 점검 문의</div>
-        <div class="planner-name">{{ planner.name }}</div>
+
+        <div class="planner-name">{{ planner.name }} FC</div>
         <div class="planner-org">{{ planner.org_display }}</div>
-        <div class="planner-phone">연락처 : {{ planner.phone_display }}</div>
+
+        <div class="planner-row">
+          <div class="planner-label">연락처</div>
+          <div class="planner-value">{{ planner.phone_display }}</div>
+        </div>
+
         {% if planner.email %}
-          <div class="planner-email">이메일 : {{ planner.email }}</div>
+        <div class="planner-row">
+          <div class="planner-label">이메일</div>
+          <div class="planner-value">{{ planner.email }}</div>
+        </div>
         {% endif %}
       </div>
     </section>
