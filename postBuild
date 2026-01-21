@@ -1,1 +1,6 @@
-python -m playwright install --with-deps chromium
+#!/usr/bin/env bash
+set -euxo pipefail
+
+python -m playwright install chromium
+# 만약 OS 의존성 문제까지 같이 설치해야 하면 아래로 교체:
+# python -m playwright install --with-deps chromium
