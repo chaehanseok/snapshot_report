@@ -14,24 +14,30 @@
     <header class="header">
       <div class="header-left">
         <div class="label">LIFE REPORT</div>
+
         <div class="title">
-          <strong>{{ customer.name }}</strong> 고객님을 위한<br/>
-          {{ customer.age_band }} · {{ customer.gender }} 보장 점검 안내
+          {{ customer.name }} 고객님을 위한<br/>
+          <strong>{{ customer.age_band }} · {{ customer.gender }}</strong> 보장 점검 안내
         </div>
-        <div class="subtitle">보험 가입 여부보다 “현재 기준 최소 구조”가 갖춰져 있는지 점검이 중요합니다.</div>
-        <div class="meta-inline">기준연도 {{ stats.base_year }} · {{ stats.source }} · v{{ version }}</div>
+
+        <div class="subtitle">
+          보험 가입 여부보다 “현재 기준 최소 구조”가 갖춰져 있는지 점검이 중요합니다.
+        </div>
+
+        <div class="meta-inline">
+          기준연도 {{ stats.base_year }} · {{ stats.source }} · v{{ version }}
+        </div>
       </div>
 
       <div class="header-right">
         <div class="logo">
           {% if logo_data_uri %}
-            <img src="{{ logo_data_uri }}" alt="Mirae Asset logo" />
+            <img src="{{ logo_data_uri }}" alt="Mirae Asset" />
           {% endif %}
         </div>
       </div>
     </header>
 
-    <!-- 요약 -->
     <section class="section">
       <h2 class="section-title">요약</h2>
       <ul class="bullets">
@@ -41,7 +47,6 @@
       </ul>
     </section>
 
-    <!-- 현황 통계 -->
     <section class="section">
       <h2 class="section-title">현황 통계 예시</h2>
       <div class="cards">
@@ -57,66 +62,50 @@
       </div>
     </section>
 
-    <!-- 질문 + 구조표 (2단 배치로 1page 최적화) -->
-    <section class="section">
-      <div class="grid2">
-        <div>
-          <h2 class="section-title">점검 질문</h2>
-          <ol class="questions">
-            {% for q in segment.gap_questions %}
-              <li>{{ q }}</li>
-            {% endfor %}
-          </ol>
-        </div>
+    <div class="grid2">
+      <section class="section">
+        <h2 class="section-title">점검 질문</h2>
+        <ol class="questions">
+          {% for q in segment.gap_questions %}
+            <li>{{ q }}</li>
+          {% endfor %}
+        </ol>
+      </section>
 
-        <div>
-          <h2 class="section-title">필요 보장 구조(개요)</h2>
-          <div class="table">
-            <div class="row head">
-              <div class="cell col1">보장 영역</div>
-              <div class="cell col2">점검이 필요한 이유</div>
-            </div>
-            {% for r in structure_rows %}
-              <div class="row">
-                <div class="cell col1">{{ r.area }}</div>
-                <div class="cell col2">{{ r.reason }}</div>
-              </div>
-            {% endfor %}
+      <section class="section">
+        <h2 class="section-title">필요 보장 구조(개요)</h2>
+        <div class="table">
+          <div class="row head">
+            <div class="cell col1">보장 영역</div>
+            <div class="cell col2">점검이 필요한 이유</div>
           </div>
+          {% for r in structure_rows %}
+          <div class="row">
+            <div class="cell col1">{{ r.area }}</div>
+            <div class="cell col2">{{ r.reason }}</div>
+          </div>
+          {% endfor %}
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
-    <!-- CTA -->
     <section class="cta">
       <div class="cta__headline">확인하고 싶으시면, 한 번에 점검해보시죠.</div>
       <div class="cta__body">{{ segment.cta }}</div>
     </section>
 
-    <!-- Planner (요청 반영: 박동혁 FC / 조직 / 연락처 포맷) -->
     <section class="planner">
       <div class="planner-box">
         <div class="planner-title">상담 및 보장 점검 문의</div>
-
         <div class="planner-name">{{ planner.name }}</div>
         <div class="planner-org">{{ planner.org_display }}</div>
-
-        <div class="planner-row">
-          <span class="planner-label">연락처 :</span>
-          <span class="planner-text">{{ planner.phone_display }}</span>
-        </div>
-
+        <div class="planner-phone">연락처 : {{ planner.phone_display }}</div>
         {% if planner.email %}
-        <div class="planner-row">
-          <span class="planner-label">이메일 :</span>
-          <span class="planner-text">{{ planner.email }}</span>
-        </div>
+          <div class="planner-email">이메일 : {{ planner.email }}</div>
         {% endif %}
       </div>
     </section>
 
-
-    <!-- Footer -->
     <footer class="footer">
       <div class="footer__disclaimer">{{ footer.disclaimer }}</div>
       <div class="footer__legal">{{ footer.legal_note }}</div>
