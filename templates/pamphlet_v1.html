@@ -63,33 +63,35 @@
         </div>
       </section>
 
-      <div class="grid2">
-        <section class="section">
-          <h2 class="section-title">점검 질문</h2>
-          <ol class="questions">
-            {% for q in segment.gap_questions %}
-              <li>{{ q }}</li>
-            {% endfor %}
-          </ol>
-        </section>
+      <section class="section">
+        <div class="grid2">
+          <div>
+            <h2 class="section-title">점검 질문</h2>
+            <ol class="questions">
+              {% for q in segment.gap_questions %}
+                <li>{{ q }}</li>
+              {% endfor %}
+            </ol>
+          </div>    
 
-        <section class="section">
-          <h2 class="section-title">필요 보장 구조(개요)</h2>
-          <div class="table">
-            <div class="row head">
-              <div class="cell col1">보장 영역</div>
-              <div class="cell col2">점검이 필요한 이유</div>
+          <div>
+            <h2 class="section-title">필요 보장 구조(개요)</h2>
+            <div class="table">
+              <div class="row head">
+                <div class="cell col1">보장 영역</div>
+                <div class="cell col2">점검이 필요한 이유</div>
+              </div>
+              {% for r in structure_rows %}
+              <div class="row">
+                <div class="cell col1">{{ r.area }}</div>
+                <div class="cell col2">{{ r.reason }}</div>
+              </div>
+              {% endfor %}
             </div>
-            {% for r in structure_rows %}
-            <div class="row">
-              <div class="cell col1">{{ r.area }}</div>
-              <div class="cell col2">{{ r.reason }}</div>
-            </div>
-            {% endfor %}
           </div>
-        </section>
-      </div>
-
+        </div>    
+      </section>
+      
       <section class="cta">
         <div class="cta__headline">확인하고 싶으시면, 한 번에 점검해보시죠.</div>
         <div class="cta__body">{{ segment.cta }}</div>
@@ -113,7 +115,7 @@
       </footer>
     </div>
   </div> 
-  
+
   <script>
     (function () {
       const viewport = document.querySelector(".preview-viewport");

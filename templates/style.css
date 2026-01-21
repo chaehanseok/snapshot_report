@@ -133,7 +133,7 @@ html, body{
 }
 
 .logo img{
-  height: 34px;  /* 26px -> 34px */
+  height: 40px;  /* 26px -> 34px */
   width: auto;
   object-fit: contain;
 }
