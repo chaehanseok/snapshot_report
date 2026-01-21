@@ -3,3 +3,5 @@ set -euxo pipefail
 
 export PLAYWRIGHT_BROWSERS_PATH="$PWD/.pw-browsers"
 python -m playwright install --with-deps chromium
+
+ls -al "$PWD/.pw-browsers" || true
