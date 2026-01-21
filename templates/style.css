@@ -138,7 +138,7 @@ html, body{
   justify-content:flex-end;
 }
 .logo img{
-  height:40px; /* 로고 키움 */
+  height:44px; /* 로고 키움 */
   width:auto;
   object-fit:contain;
 }
@@ -165,24 +165,49 @@ html, body{
 }
 
 /* =========================
-   Bullets / Questions
-   - 브라우저/WeasyPrint 불일치 최소화: 기본 list-style 유지
+   Bullets / Questions (안정화 버전)
+   - WeasyPrint에서 list marker 누락 방지
    ========================= */
-.bullets{
-  margin:0;
-  padding-left:18px;
-  list-style:disc;
-  list-style-position:outside;
-}
-.bullets li{ margin:5px 0; }
 
-.questions{
+/* bullets */
+.bullets{
+  list-style:none;
   margin:0;
-  padding-left:18px;
-  list-style:decimal;
-  list-style-position:outside;
+  padding-left:0;
 }
-.questions li{ margin:6px 0; }
+.bullets li{
+  position:relative;
+  padding-left:16px;
+  margin:5px 0;
+}
+.bullets li::before{
+  content:"•";
+  position:absolute;
+  left:0;
+  top:0;
+}
+
+/* questions */
+.questions{
+  list-style:none;
+  margin:0;
+  padding-left:0;
+  counter-reset:q;
+}
+.questions li{
+  position:relative;
+  padding-left:18px;
+  margin:6px 0;
+}
+.questions li::before{
+  counter-increment:q;
+  content: counter(q) ".";
+  position:absolute;
+  left:0;
+  top:0;
+  font-weight:700;
+}
+
 
 /* =========================
    Cards

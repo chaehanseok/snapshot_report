@@ -117,26 +117,64 @@
   </div> 
 
   <script>
-    (function () {
-      const viewport = document.querySelector(".preview-viewport");
-      const page = document.querySelector(".page");
-      if (!viewport || !page) return;
+  (function () {
+    const viewport = document.querySelector(".preview-viewport");
+    const page = document.querySelector(".page");
+    if (!viewport || !page) return;
 
-      function fit() {
-        // page는 A4 폭(210mm)을 CSS로 고정해두고, 화면에서만 scale
-        const vw = viewport.clientWidth;
-        const pw = page.scrollWidth; // px 기준 page 실제 폭
-        const scale = Math.min(1, vw / pw);
+    function getScale() {
+      // viewport 안에서 A4 page를 "가로 기준으로"만 축소
+      const vw = viewport.clientWidth;
+      const pw = page.getBoundingClientRect().width; // transform 전 기준 폭
+      if (!pw) return 1;
+      return Math.min(1, vw / pw);
+    }
 
-        page.style.transform = `scale(${scale})`;
-        page.style.transformOrigin = "top left";
-        viewport.style.height = (page.scrollHeight * scale) + "px";
-      }
+    function fitAndReport() {
+      // 1) scale 적용
+      const scale = getScale();
+      page.style.transform = `scale(${scale})`;
+      page.style.transformOrigin = "top left";
 
-      new ResizeObserver(fit).observe(viewport);
-      window.addEventListener("load", fit);
-      fit();
-    })();
+      // 2) viewport 높이 정확히 계산 (scrollHeight는 transform 반영 안 하는 경우가 있어 rect 사용)
+      //    getBoundingClientRect()는 transform 적용 후 크기를 반영함
+      const rect = page.getBoundingClientRect();
+      const targetH = Math.ceil(rect.height);
+
+      viewport.style.height = targetH + "px";
+
+      // 3) Streamlit iframe 높이를 컨텐츠에 맞춰 자동 조절 (빈 여백 제거 핵심)
+      try {
+        window.parent.postMessage(
+          { type: "streamlit:setFrameHeight", height: targetH + 20 },
+          "*"
+        );
+      } catch (e) {}
+    }
+
+    // 레이아웃/폰트/이미지 로드로 높이 변하는 케이스까지 커버
+    const ro = new ResizeObserver(fitAndReport);
+    ro.observe(viewport);
+    ro.observe(page);
+
+    window.addEventListener("load", fitAndReport);
+    window.addEventListener("resize", fitAndReport);
+
+    // 폰트 로딩 이후 재계산(폰트가 PDF/미리보기 느낌 차이 만들던 핵심 포인트)
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(fitAndReport).catch(() => {});
+    }
+
+    // 이미지(로고) 로드 후에도 재계산
+    const imgs = page.querySelectorAll("img");
+    imgs.forEach(img => {
+      if (!img.complete) img.addEventListener("load", fitAndReport, { once: true });
+    });
+
+    // 최초 1회
+    fitAndReport();
+  })();
   </script>
+
 </body>
 </html>

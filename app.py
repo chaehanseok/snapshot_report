@@ -402,7 +402,12 @@ final_html = build_final_html_for_both(context)
 
 st.subheader("미리보기")
 # 스케일 스크립트가 viewport 높이를 잡아주므로, scrolling=False가 더 깔끔한 경우가 많음
-components.html(final_html, height=1200, scrolling=False)
+components.html(
+    final_html,
+    height=10,          # 처음엔 작게
+    scrolling=False,
+    key="preview_iframe"  # key는 필수
+)
 
 st.divider()
 st.subheader("확정 및 PDF 출력")
