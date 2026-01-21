@@ -8,6 +8,14 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from io import BytesIO
 
+import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
+PW_DIR = BASE_DIR / ".pw-browsers"
+
+# 빌드/런타임 사용자 달라도 동일 위치를 보게 고정
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(PW_DIR)
 
 # ----------------------------
 # Config
