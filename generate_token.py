@@ -10,7 +10,7 @@ SECRET = "5f9f2e5e69605a9492613df1ed074672bf49f44621116cc1189a3816e98be9fc"
 def b64url_encode(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
 
-def make_token(name: str, phone: str, email: str = "", org: str="", ttl_sec: int = 3600) -> str:
+def make_token(name: str, phone: str, email: str = "", org: str="", ttl_sec: int = 6000) -> str:
     payload = {
         "name": name,
         "phone": phone,
@@ -35,9 +35,9 @@ def make_token(name: str, phone: str, email: str = "", org: str="", ttl_sec: int
 
 if __name__ == "__main__":
     token = make_token(
-        name="안은희",
-        phone="010-3185-3568",
-        email="MFSC3113@miraeasset.com",
-        org="영업지원본부 업무지원팀"
+        name="소정현",
+        phone="010-2936-6604",
+        email="goobykorea@nate.com",
+        org="강남에이스사업본부 강남에이스직할지점"
     )
     print(token)
