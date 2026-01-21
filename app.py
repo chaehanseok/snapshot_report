@@ -11,12 +11,9 @@ from io import BytesIO
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).parent
-PW_DIR = BASE_DIR / ".pw-browsers"
-
-# 빌드/런타임 사용자 달라도 동일 위치를 보게 고정
+PW_DIR = Path("/tmp/pw-browsers")  # 가장 안전
+PW_DIR.mkdir(parents=True, exist_ok=True)
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(PW_DIR)
-
 
 st.caption(f"PLAYWRIGHT_BROWSERS_PATH={os.environ.get('PLAYWRIGHT_BROWSERS_PATH')}")
 st.caption(f"exists? {Path(os.environ['PLAYWRIGHT_BROWSERS_PATH']).exists()}")
@@ -105,6 +102,23 @@ def segment_key(age_band: str, gender: str) -> str:
         a = "50"
     g = "M" if gender == "남성" else "F"
     return f"{a}_{g}"
+
+
+import subprocess
+import sys
+import streamlit as st
+from pathlib import Path
+import os
+
+@st.cache_resource(show_spinner=False)
+def ensure_playwright_chromium():
+    browsers_path = Path(os.environ["PLAYWRIGHT_BROWSERS_PATH"])
+    # 설치 흔적이 없으면 설치
+    if not any(browsers_path.glob("**/chrome-headless-shell")) and not any(browsers_path.glob("**/chromium")):
+        # Playwright 공식 설치 커맨드(브라우저 다운로드) :contentReference[oaicite:2]{index=2}
+        subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+    return True
+
 
 
 # ----------------------------
@@ -310,26 +324,26 @@ def weasyprint_pdf_bytes(html: str) -> bytes:
 
 
 def chromium_pdf_bytes(html: str) -> bytes:
-    # requirements: playwright
-    # 그리고 배포 환경에서: playwright install chromium
     from playwright.sync_api import sync_playwright
 
+    ensure_playwright_chromium()
+
     with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
+        browser = p.chromium.launch(args=["--no-sandbox"])
+        page = browser.new_page(viewport={"width": 1200, "height": 800})
 
-        # HTML 주입
         page.set_content(html, wait_until="load")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(100)  # 레이아웃/폰트 settle
 
-        # A4 PDF 생성 (배경 포함)
         pdf_bytes = page.pdf(
             format="A4",
             print_background=True,
             margin={"top": "0mm", "right": "0mm", "bottom": "0mm", "left": "0mm"},
         )
-
         browser.close()
         return pdf_bytes
+
 
 
 # ----------------------------
@@ -455,6 +469,8 @@ if st.button("확정 후 PDF 생성"):
     context["customer"]["name"] = customer_name.strip()
     context["segment"]["headline"] = segment["headline"].replace("{customer_name}", customer_name.strip())
     final_html = build_final_html_for_both(context)
+
+    ensure_playwright_chromium()
 
     try:
         pdf_bytes = chromium_pdf_bytes(final_html)
