@@ -3,4 +3,4 @@ jinja2
 reportlab
 weasyprint==61.2
 pydyf==0.10.0
-playwright
+playwright==1.57.0
