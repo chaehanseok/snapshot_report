@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
-export PLAYWRIGHT_BROWSERS_PATH="$PWD/.pw-browsers"
-python -m playwright install --with-deps chromium
+echo "=== postBuild START ==="
+pwd
+ls -al
 
-ls -al "$PWD/.pw-browsers" || true
+export PLAYWRIGHT_BROWSERS_PATH="$PWD/.pw-browsers"
+echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH"
+
+mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
+python -m playwright --version
+
+python -m playwright install chromium
+echo "=== after install ==="
+ls -al "$PLAYWRIGHT_BROWSERS_PATH" || true
+
+echo "=== postBuild END ==="
