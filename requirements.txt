@@ -4,3 +4,4 @@ reportlab
 weasyprint==61.2
 pydyf==0.10.0
 playwright==1.57.0
+requests

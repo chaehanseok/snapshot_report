@@ -10,6 +10,7 @@ from io import BytesIO
 
 import os
 from pathlib import Path
+import requests
 
 PW_DIR = Path("/tmp/pw-browsers")  # 가장 안전
 PW_DIR.mkdir(parents=True, exist_ok=True)
@@ -118,6 +119,41 @@ def ensure_playwright_chromium():
         # Playwright 공식 설치 커맨드(브라우저 다운로드) :contentReference[oaicite:2]{index=2}
         subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
     return True
+
+def d1_query(sql: str, params: list | None = None) -> list[dict]:
+    """
+    Cloudflare D1 HTTP API로 SQL 실행.
+    반환: rows(list[dict])만 깔끔하게 리턴.
+    """
+    account_id = st.secrets.get("CF_ACCOUNT_ID", "")
+    db_id = st.secrets.get("D1_DATABASE_ID", "")
+    token = st.secrets.get("CF_API_TOKEN", "")
+
+    if not (account_id and db_id and token):
+        raise RuntimeError("D1 연결정보가 없습니다. Secrets에 CF_ACCOUNT_ID, D1_DATABASE_ID, CF_API_TOKEN을 설정하세요.")
+
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{db_id}/query"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "sql": sql,
+        "params": params or [],
+    }
+
+    r = requests.post(url, headers=headers, json=payload, timeout=30)
+    r.raise_for_status()
+    data = r.json()
+
+    if not data.get("success"):
+        # Cloudflare가 주는 에러 메시지 노출
+        raise RuntimeError(f"D1 query failed: {data.get('errors')}")
+
+    # D1 응답은 result 배열로 오고, 첫 쿼리의 rows가 여기 들어감
+    result0 = (data.get("result") or [{}])[0]
+    rows = result0.get("results") or []
+    return rows
 
 
 
@@ -361,6 +397,52 @@ try:
 except Exception as e:
     st.error(f"접속 검증 실패: {e}")
     st.stop()
+
+st.subheader("D1 연결 테스트")
+
+colA, colB = st.columns([1, 2])
+with colA:
+    test_year = st.selectbox("샘플 연도", ["2024", "2023", "2022", "2021"], index=0)
+    test_age = st.selectbox("샘플 연령", ["50_59", "40_49", "30_39", "20_29", "60_69"], index=0)
+    test_sex = st.selectbox("샘플 성별", ["A", "M", "F"], index=0)
+
+with colB:
+    st.caption("샘플: 특정 연도/연령/성별에서 5개 질병만 미리보기")
+
+if st.button("D1 샘플 조회", type="primary"):
+    sql = """
+    SELECT disease_code, year, age_group, sex, patient_cnt, total_cost, visit_days,
+           population, prevalence_per_100k, cost_per_patient
+    FROM disease_year_age_sex_metrics
+    WHERE year = ? AND age_group = ? AND sex = ?
+    ORDER BY prevalence_per_100k DESC
+    LIMIT 5;
+    """
+    try:
+        rows = d1_query(sql, [int(test_year), test_age, test_sex])
+        if not rows:
+            st.warning("조회 결과가 없습니다.")
+        else:
+            st.dataframe(rows, use_container_width=True)
+    except Exception as e:
+        st.error(f"D1 조회 실패: {e}")
+
+with st.expander("데이터 범위/건수 확인"):
+    if st.button("범위 확인"):
+        sql = """
+        SELECT
+          MIN(year) AS min_year,
+          MAX(year) AS max_year,
+          COUNT(*)  AS row_cnt,
+          COUNT(DISTINCT disease_code) AS disease_cnt
+        FROM disease_year_age_sex_metrics;
+        """
+        try:
+            rows = d1_query(sql)
+            st.json(rows[0] if rows else {})
+        except Exception as e:
+            st.error(f"범위 확인 실패: {e}")
+
 
 segments_db = load_json(SEGMENTS_PATH)
 stats_db = load_json(STATS_PATH)
