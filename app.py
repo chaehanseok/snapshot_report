@@ -17,6 +17,10 @@ PW_DIR = BASE_DIR / ".pw-browsers"
 # 빌드/런타임 사용자 달라도 동일 위치를 보게 고정
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(PW_DIR)
 
+
+st.caption(f"PLAYWRIGHT_BROWSERS_PATH={os.environ.get('PLAYWRIGHT_BROWSERS_PATH')}")
+st.caption(f"exists? {Path(os.environ['PLAYWRIGHT_BROWSERS_PATH']).exists()}")
+
 # ----------------------------
 # Config
 # ----------------------------
