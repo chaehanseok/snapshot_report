@@ -297,6 +297,29 @@ def weasyprint_pdf_bytes(html: str) -> bytes:
     return HTML(string=html, base_url=str(TEMPLATES_DIR)).write_pdf()
 
 
+def chromium_pdf_bytes(html: str) -> bytes:
+    # requirements: playwright
+    # 그리고 배포 환경에서: playwright install chromium
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+
+        # HTML 주입
+        page.set_content(html, wait_until="load")
+
+        # A4 PDF 생성 (배경 포함)
+        pdf_bytes = page.pdf(
+            format="A4",
+            print_background=True,
+            margin={"top": "0mm", "right": "0mm", "bottom": "0mm", "left": "0mm"},
+        )
+
+        browser.close()
+        return pdf_bytes
+
+
 # ----------------------------
 # Streamlit UI
 # ----------------------------
@@ -422,15 +445,11 @@ if st.button("확정 후 PDF 생성"):
     final_html = build_final_html_for_both(context)
 
     try:
-        pdf_bytes = weasyprint_pdf_bytes(final_html)
+        pdf_bytes = chromium_pdf_bytes(final_html)
         filename = f"보장점검안내_{customer_name.strip()}_{age_band}_{gender}.pdf"
 
         # 새 탭 열지 않고 바로 다운로드만 제공 (Chrome 차단 회피)
-        st.download_button(
-            "PDF 다운로드",
-            data=pdf_bytes,
-            file_name=filename,
-            mime="application/pdf"
-        )
+        st.download_button("PDF 다운로드", data=pdf_bytes, file_name=filename, mime="application/pdf")
+        
     except Exception as e:
         st.error(f"PDF 생성(WeasyPrint) 중 오류가 발생했습니다.\n\n오류: {e}")
