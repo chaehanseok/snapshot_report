@@ -406,7 +406,6 @@ components.html(
     final_html,
     height=10,          # 처음엔 작게
     scrolling=False,
-    key="preview_iframe"  # key는 필수
 )
 
 st.divider()
