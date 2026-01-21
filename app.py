@@ -404,7 +404,7 @@ st.subheader("미리보기")
 # 스케일 스크립트가 viewport 높이를 잡아주므로, scrolling=False가 더 깔끔한 경우가 많음
 components.html(
     final_html,
-    height=1200,          # 처음엔 작게
+    height=900,          # 처음엔 작게
     scrolling=True,
 )
 
