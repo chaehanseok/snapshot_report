@@ -8,6 +8,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from io import BytesIO
 
+
 # ----------------------------
 # Config
 # ----------------------------
@@ -27,12 +28,11 @@ BRAND_SUBTITLE = "통계 기반 보장 점검 안내"
 ASSETS_DIR = TEMPLATES_DIR / "assets"
 FONT_DIR = ASSETS_DIR / "fonts"
 
-# 로고 파일을 여기에 두세요 (질문에서 준 로고 이미지 저장)
 # 예: templates/assets/ma_logo.png
 LOGO_PATH = ASSETS_DIR / "ma_logo.png"
 
-# HMAC secret for gateway token validation
 SECRET = st.secrets.get("GATEWAY_SECRET", "")
+
 
 # ----------------------------
 # Token helpers
@@ -65,7 +65,7 @@ def verify_token(token: str) -> Dict[str, Any]:
         raise ValueError("Missing planner fields")
 
     phone_digits = re.sub(r"\D", "", phone)
-    org = str(payload.get("org", "")).strip()  # 토큰에 org 넣으면 표시
+    org = str(payload.get("org", "")).strip()
 
     return {
         "name": name,
@@ -73,6 +73,7 @@ def verify_token(token: str) -> Dict[str, Any]:
         "email": payload.get("email", None),
         "org": org,
     }
+
 
 # ----------------------------
 # Content loaders
@@ -92,6 +93,7 @@ def segment_key(age_band: str, gender: str) -> str:
         a = "50"
     g = "M" if gender == "남성" else "F"
     return f"{a}_{g}"
+
 
 # ----------------------------
 # Utilities
@@ -115,34 +117,104 @@ def file_to_data_uri(path: Path, mime: str) -> Optional[str]:
     return f"data:{mime};base64,{data}"
 
 def font_file_to_data_uri(path: Path) -> str:
-    # ttf는 WeasyPrint/브라우저 모두 data uri로 안정적으로 처리됨
     data = base64.b64encode(path.read_bytes()).decode("utf-8")
     return f"data:font/ttf;base64,{data}"
 
-def build_css_with_embedded_fonts(css_path: Path) -> str:
-    """
-    미리보기와 PDF를 '완전 동일'하게 맞추기 위해:
-    - CSS를 inline로 쓰되
-    - 폰트 url(...)를 data:URI로 치환
-    """
-    css_text = css_path.read_text(encoding="utf-8")
 
+def build_embedded_font_face_css() -> str:
+    """
+    폰트를 '치환'하지 않고, 항상 최상단에 강제 선언해서
+    미리보기/WeasyPrint의 폰트 일치도를 극대화한다.
+    """
     regular_ttf = FONT_DIR / "NotoSansKR-Regular.ttf"
     bold_ttf = FONT_DIR / "NotoSansKR-Bold.ttf"
 
     if not regular_ttf.exists() or not bold_ttf.exists():
-        raise RuntimeError("폰트 파일이 없습니다. templates/assets/fonts/에 NotoSansKR-Regular.ttf, NotoSansKR-Bold.ttf를 넣어주세요.")
+        raise RuntimeError(
+            "폰트 파일이 없습니다. templates/assets/fonts/에 "
+            "NotoSansKR-Regular.ttf, NotoSansKR-Bold.ttf를 넣어주세요."
+        )
 
     reg_uri = font_file_to_data_uri(regular_ttf)
     bold_uri = font_file_to_data_uri(bold_ttf)
 
-    # CSS에 있는 폰트 경로를 data URI로 강제
-    css_text = css_text.replace('url("assets/fonts/NotoSansKR-Regular.ttf")', f'url("{reg_uri}")')
-    css_text = css_text.replace("url('assets/fonts/NotoSansKR-Regular.ttf')", f'url("{reg_uri}")')
-    css_text = css_text.replace('url("assets/fonts/NotoSansKR-Bold.ttf")', f'url("{bold_uri}")')
-    css_text = css_text.replace("url('assets/fonts/NotoSansKR-Bold.ttf')", f'url("{bold_uri}")')
+    return f"""
+/* ===== Embedded Fonts (Data URI) ===== */
+@font-face {{
+  font-family: "NotoSansKR";
+  src: url("{reg_uri}") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}}
+@font-face {{
+  font-family: "NotoSansKR";
+  src: url("{bold_uri}") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}}
+"""
 
-    return css_text
+
+def build_css_for_both(css_path: Path) -> str:
+    """
+    - style.css 원문 + (1) 임베딩 폰트 강제 + (2) bullet/number 커스텀 고정
+    """
+    base_css = css_path.read_text(encoding="utf-8")
+
+    # (A) 폰트 선언을 맨 위로 강제
+    font_css = build_embedded_font_face_css()
+
+    # (B) WeasyPrint에서 list marker 누락을 피하려고 커스텀 마커로 확정
+    #     (원 CSS에서 bullets/questions를 list-style로 쓰더라도, 마지막 override로 고정됨)
+    bullet_fix_css = """
+/* ===== List marker stabilization (Browser + WeasyPrint) ===== */
+/* bullets: 점(•)을 직접 찍어서 PDF에서 안 보이는 문제 회피 */
+.bullets{
+  list-style:none !important;
+  margin:0 !important;
+  padding-left:0 !important;
+}
+.bullets li{
+  position:relative;
+  padding-left:16px;
+  margin:5px 0;
+}
+.bullets li::before{
+  content:"•";
+  position:absolute;
+  left:0;
+  top:0;
+}
+
+/* questions: counter로 번호를 직접 찍어서 렌더 불일치 최소화 */
+.questions{
+  list-style:none !important;
+  margin:0 !important;
+  padding-left:0 !important;
+  counter-reset:q;
+}
+.questions li{
+  position:relative;
+  padding-left:18px;
+  margin:6px 0;
+}
+.questions li::before{
+  counter-increment:q;
+  content: counter(q) ".";
+  position:absolute;
+  left:0;
+  top:0;
+  font-weight:700;
+}
+
+/* preview-viewport이 비정상 구조일 때 빈 여백 생기는 것 방지용 기본값 */
+.preview-viewport{
+  display:block;
+}
+"""
+
+    return f"{font_css}\n{base_css}\n{bullet_fix_css}"
+
 
 def render_html(context: Dict[str, Any]) -> str:
     env = Environment(
@@ -152,22 +224,65 @@ def render_html(context: Dict[str, Any]) -> str:
     template = env.get_template(HTML_TEMPLATE)
     return template.render(**context)
 
-def build_final_html_for_both(context: Dict[str, Any]) -> str:
-    """
-    미리보기/WeasyPrint 모두 동일한 HTML을 사용.
-    - CSS를 <style>로 주입
-    - 폰트는 data-uri로 주입되어 렌더 차이 최소화
-    """
-    html = render_html(context)
 
-    css_text = build_css_with_embedded_fonts(CSS_PATH)
+def fix_preview_wrapper_structure(html: str) -> str:
+    """
+    템플릿이 아래처럼 잘못된 경우를 자동으로 보정:
+      <div class="preview-viewport"></div>
+        <div class="page">...
 
-    # 템플릿의 <link ...>를 inline <style>로 치환
-    html = html.replace(
-        f'<link rel="stylesheet" href="{context["css_path"]}" />',
-        f"<style>\n{css_text}\n</style>"
+    -> 아래처럼 바꿔서 스케일 스크립트가 정상 동작하게 함:
+      <div class="preview-viewport">
+        <div class="page">...
+    """
+    # 케이스1) 빈 preview-viewport를 닫아버린 경우
+    html = re.sub(
+        r'<div class="preview-viewport">\s*</div>\s*<div class="page">',
+        r'<div class="preview-viewport">\n<div class="page">',
+        html,
+        flags=re.IGNORECASE
+    )
+
+    # 케이스2) preview-viewport가 아예 없고 page만 있는 경우: page를 감싸준다(가능한 범위에서)
+    if 'class="preview-viewport"' not in html and 'class="page"' in html:
+        html = html.replace('<div class="page">', '<div class="preview-viewport">\n<div class="page">', 1)
+        # body 닫기 직전에 viewport 닫기 추가(간단 보정)
+        html = html.replace("</body>", "\n</div>\n</body>", 1)
+
+    return html
+
+
+def inject_inline_css(html: str, css_text: str, css_path_in_template: str) -> str:
+    """
+    템플릿의 <link rel="stylesheet" ...>를 <style>로 치환.
+    """
+    needle = f'<link rel="stylesheet" href="{css_path_in_template}" />'
+    if needle in html:
+        return html.replace(needle, f"<style>\n{css_text}\n</style>")
+    # 혹시 템플릿에서 href가 다르면, link 태그를 더 넓게 잡아서 제거/주입
+    html = re.sub(
+        r'<link\s+rel=["\']stylesheet["\']\s+href=["\'][^"\']+["\']\s*/?>',
+        f"<style>\n{css_text}\n</style>",
+        html,
+        count=1,
+        flags=re.IGNORECASE
     )
     return html
+
+
+def build_final_html_for_both(context: Dict[str, Any]) -> str:
+    """
+    미리보기/WeasyPrint 모두 같은 HTML을 쓰고,
+    CSS도 동일(인라인)하게 주입하여 결과를 최대한 일치시킨다.
+    """
+    html = render_html(context)
+    html = fix_preview_wrapper_structure(html)
+
+    css_text = build_css_for_both(CSS_PATH)
+    html = inject_inline_css(html, css_text, str(context["css_path"]))
+
+    return html
+
 
 # ----------------------------
 # PDF generation (WeasyPrint)
@@ -178,8 +293,9 @@ def weasyprint_pdf_bytes(html: str) -> bytes:
     except Exception:
         raise RuntimeError("WeasyPrint not installed. requirements.txt에 weasyprint를 추가하고 배포 환경에서 설치해 주세요.")
 
-    # base_url은 상대경로용이지만, 지금은 폰트/로고를 data-uri로 쓰므로 거의 영향 없음
+    # JS는 WeasyPrint에서 무시되므로(정상), preview용 scale 스크립트가 PDF를 망치지 않는다.
     return HTML(string=html, base_url=str(TEMPLATES_DIR)).write_pdf()
+
 
 # ----------------------------
 # Streamlit UI
@@ -255,8 +371,8 @@ context = {
         "age_band": age_band
     },
     "planner": {
-        # 리포트 표시 요구사항 반영
-        "name": f"{planner['name']} FC",  # 박동혁 FC
+        # 요구사항 반영: "박동혁 FC" 형태
+        "name": f"{planner['name']} FC",
         "phone": planner["phone"],
         "email": planner.get("email", None),
         "org": planner.get("org", "").strip(),
@@ -285,14 +401,12 @@ context = {
 final_html = build_final_html_for_both(context)
 
 st.subheader("미리보기")
-# height는 충분히 크게
-components.html(final_html, height=1100, scrolling=True)
+# 스케일 스크립트가 viewport 높이를 잡아주므로, scrolling=False가 더 깔끔한 경우가 많음
+components.html(final_html, height=1200, scrolling=False)
 
 st.divider()
 st.subheader("확정 및 PDF 출력")
 
-# “Chrome 차단 페이지” 뜨는 건 새 탭/새 창으로 pdf를 열려고 할 때 생기는 케이스가 많습니다.
-# 여기서는 '열기' 없이 곧바로 download_button만 노출합니다.
 if st.button("확정 후 PDF 생성"):
     if not customer_name.strip():
         st.warning("고객 성명을 입력해 주세요.")
@@ -306,6 +420,8 @@ if st.button("확정 후 PDF 생성"):
     try:
         pdf_bytes = weasyprint_pdf_bytes(final_html)
         filename = f"보장점검안내_{customer_name.strip()}_{age_band}_{gender}.pdf"
+
+        # 새 탭 열지 않고 바로 다운로드만 제공 (Chrome 차단 회피)
         st.download_button(
             "PDF 다운로드",
             data=pdf_bytes,
