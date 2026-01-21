@@ -6,6 +6,7 @@
   margin: 0; /* PDF 여백은 .page padding으로 통일 */
 }
 
+
 /* =========================
    Base
    ========================= */
@@ -45,26 +46,33 @@ html, body{
   line-height:1.36; /* 1page 안정 */
 }
 
-/* =========================
-   Page (screen + pdf 동일)
-   ========================= */
-.page{
-  padding: 10mm;
+/* 미리보기 컨테이너(화면에서만 scale-to-fit을 위한 래퍼) */
+.preview-viewport{
   width: 100%;
+  overflow: hidden; /* 좌우 스크롤 제거 */
 }
 
-/* screen에서 A4 느낌만 주되, 레이아웃 자체는 동일 */
+/* page는 A4 기준 폭을 '항상' 유지 (PDF/화면 공통 기준점) */
+.page{
+  width: 210mm;
+  min-height: 297mm;
+  padding: 10mm;
+  background: #fff;
+}
+
+/* 화면에서는 가운데 정렬 + 그림자 정도만 */
 @media screen{
   body{ background:#f3f4f6; }
-  .page{
-    width: 210mm;
-    min-height: 297mm;
+  .preview-viewport{
     margin: 12px auto;
-    background:#fff;
+    max-width: 1100px; /* 큰 화면에서 너무 커 보이면 제한 */
+  }
+  .page{
     box-shadow: 0 8px 24px rgba(0,0,0,0.08);
     border-radius: 10px;
   }
 }
+
 
 /* =========================
    Top band
@@ -81,13 +89,14 @@ html, body{
    ========================= */
 .header{
   display:grid;
-  grid-template-columns: 1fr 170px; /* 좌측 / 우측 로고 */
+  grid-template-columns: 1fr 200px; /* 170px -> 200px */
   gap:14px;
   align-items:start;
   padding:10px 0 8px 0;
   border-bottom:1px solid var(--border);
   margin-bottom:10px;
 }
+
 
 .label{
   font-weight:800;
@@ -112,7 +121,7 @@ html, body{
   color: var(--muted);
 }
 .meta-inline{
-  margin-top:8px;
+  margin-top:6px; /* 8px -> 6px */
   font-size:11px;
   color:var(--muted);
 }
@@ -122,8 +131,9 @@ html, body{
   display:flex;
   justify-content:flex-end;
 }
+
 .logo img{
-  height: 26px;
+  height: 34px;  /* 26px -> 34px */
   width: auto;
   object-fit: contain;
 }
@@ -154,15 +164,17 @@ html, body{
 /* 브라우저/WeasyPrint 불일치 줄이려고: 기본 list-style을 살리고, 마커 스타일만 통일 */
 .bullets{
   margin:0;
-  padding-left:18px;
+  padding-left: 18px;
   list-style: disc;
+  list-style-position: outside;
 }
 .bullets li{ margin: 5px 0; }
 
 .questions{
   margin:0;
-  padding-left:18px;
+  padding-left: 18px;
   list-style: decimal;
+  list-style-position: outside;
 }
 .questions li{ margin: 6px 0; }
 

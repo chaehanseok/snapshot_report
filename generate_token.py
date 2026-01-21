@@ -35,9 +35,9 @@ def make_token(name: str, phone: str, email: str = "", org: str="", ttl_sec: int
 
 if __name__ == "__main__":
     token = make_token(
-        name="박동혁",
-        phone="010-9146-8648",
-        email="MFSC3106@miraeasset.com",
-        org="영업지원본부 조직추진팀"
+        name="안은희",
+        phone="010-3185-3568",
+        email="MFSC3113@miraeasset.com",
+        org="영업지원본부 업무지원팀"
     )
     print(token)
