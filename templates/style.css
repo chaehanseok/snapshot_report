@@ -6,7 +6,6 @@
   margin: 0; /* PDF 여백은 .page padding으로 통일 */
 }
 
-
 /* =========================
    Base
    ========================= */
@@ -17,9 +16,9 @@
   --bg:#ffffff;
   --card:#f8fafc;
 
-  /* 미래에셋 컬러 */
-  --blue:#043B72;     /* Mirae Asset Blue */
-  --orange:#F58220;   /* Mirae Asset Orange */
+  /* Mirae Asset colors */
+  --blue:#043B72;
+  --orange:#F58220;
 }
 
 @font-face{
@@ -36,50 +35,55 @@
 }
 
 *{ box-sizing:border-box; }
+
 html, body{
   margin:0;
   padding:0;
   background:var(--bg);
   color:var(--text);
-  font-family:"NotoSansKR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
-              "Malgun Gothic","Segoe UI", Roboto, Arial, sans-serif;
+  font-family:"NotoSansKR",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",
+              "Malgun Gothic","Segoe UI",Roboto,Arial,sans-serif;
   line-height:1.36; /* 1page 안정 */
 }
 
-/* 미리보기 컨테이너(화면에서만 scale-to-fit을 위한 래퍼) */
+/* =========================
+   Preview viewport (screen only wrapper)
+   - PDF는 JS가 없으므로 scale은 화면에서만 적용
+   ========================= */
 .preview-viewport{
-  width: 100%;
-  overflow: hidden; /* 좌우 스크롤 제거 */
+  width:100%;
+  overflow:hidden; /* 좌우 스크롤 제거 */
 }
 
-/* page는 A4 기준 폭을 '항상' 유지 (PDF/화면 공통 기준점) */
+/* A4 기준 page (PDF/화면 공통 기준점) */
 .page{
-  width: 210mm;
-  min-height: 297mm;
-  padding: 10mm;
-  background: #fff;
+  width:210mm;
+  min-height:297mm;
+  padding:10mm;
+  background:#fff;
 }
 
-/* 화면에서는 가운데 정렬 + 그림자 정도만 */
+/* 화면에서는 가운데 정렬 + 그림자 */
 @media screen{
   body{ background:#f3f4f6; }
+
   .preview-viewport{
-    margin: 12px auto;
-    max-width: 1100px; /* 큰 화면에서 너무 커 보이면 제한 */
+    margin:12px auto;
+    max-width:1100px;
   }
+
   .page{
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-    border-radius: 10px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.08);
+    border-radius:10px;
   }
 }
-
 
 /* =========================
    Top band
    ========================= */
 .topband{
   height:10px;
-  background: linear-gradient(90deg, var(--blue) 0 82%, var(--orange) 82% 100%);
+  background:linear-gradient(90deg, var(--blue) 0 82%, var(--orange) 82% 100%);
   border-radius:6px;
   margin-bottom:10px;
 }
@@ -89,7 +93,7 @@ html, body{
    ========================= */
 .header{
   display:grid;
-  grid-template-columns: 1fr 200px; /* 170px -> 200px */
+  grid-template-columns: 1fr 200px; /* 로고 영역 확보 */
   gap:14px;
   align-items:start;
   padding:10px 0 8px 0;
@@ -97,11 +101,10 @@ html, body{
   margin-bottom:10px;
 }
 
-
 .label{
   font-weight:800;
   font-size:12px;
-  color: var(--orange);
+  color:var(--orange);
   letter-spacing:0.3px;
 }
 
@@ -112,90 +115,93 @@ html, body{
   line-height:1.18;
 }
 .title strong{
-  color: var(--blue);
+  color:var(--blue);
   font-weight:900;
 }
+
 .subtitle{
   margin-top:6px;
   font-size:12px;
-  color: var(--muted);
+  color:var(--muted);
 }
+
 .meta-inline{
-  margin-top:6px; /* 8px -> 6px */
+  margin-top:6px;
   font-size:11px;
   color:var(--muted);
 }
 
 .header-right{ text-align:right; }
+
 .logo{
   display:flex;
   justify-content:flex-end;
 }
-
 .logo img{
-  height: 40px;  /* 26px -> 34px */
-  width: auto;
-  object-fit: contain;
+  height:40px; /* 로고 키움 */
+  width:auto;
+  object-fit:contain;
 }
 
 /* =========================
-   Section Title
+   Section title
    ========================= */
-.section{ margin-top: 10px; }
+.section{ margin-top:10px; }
+
 .section-title{
   display:flex;
   align-items:center;
   gap:8px;
-  margin: 0 0 6px 0;
+  margin:0 0 6px 0;
   font-size:12px;
   font-weight:800;
 }
 .section-title::before{
   content:"";
-  width: 6px;
-  height: 14px;
-  background: var(--blue);
-  border-radius: 3px;
+  width:6px;
+  height:14px;
+  background:var(--blue);
+  border-radius:3px;
 }
 
 /* =========================
    Bullets / Questions
+   - 브라우저/WeasyPrint 불일치 최소화: 기본 list-style 유지
    ========================= */
-/* 브라우저/WeasyPrint 불일치 줄이려고: 기본 list-style을 살리고, 마커 스타일만 통일 */
 .bullets{
   margin:0;
-  padding-left: 18px;
-  list-style: disc;
-  list-style-position: outside;
+  padding-left:18px;
+  list-style:disc;
+  list-style-position:outside;
 }
-.bullets li{ margin: 5px 0; }
+.bullets li{ margin:5px 0; }
 
 .questions{
   margin:0;
-  padding-left: 18px;
-  list-style: decimal;
-  list-style-position: outside;
+  padding-left:18px;
+  list-style:decimal;
+  list-style-position:outside;
 }
-.questions li{ margin: 6px 0; }
+.questions li{ margin:6px 0; }
 
 /* =========================
    Cards
    ========================= */
 .cards{
   display:grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns:repeat(3, 1fr);
   gap:8px;
 }
 .card{
   border:1px solid var(--border);
   border-radius:12px;
-  padding:10px 10px;
-  background: var(--card);
-  min-height: 84px;
+  padding:10px;
+  background:var(--card);
+  min-height:84px;
 }
 .card__title{
   font-size:11px;
-  color: var(--muted);
+  color:var(--muted);
   font-weight:700;
 }
 .card__value{
@@ -207,17 +213,17 @@ html, body{
 .note{
   margin-top:6px;
   font-size:10.5px;
-  color: var(--muted);
+  color:var(--muted);
 }
 
 /* =========================
-   2-column grid
+   2-column grid (Questions + Table)
    ========================= */
 .grid2{
   display:grid;
-  grid-template-columns: 1.05fr 1.35fr;
+  grid-template-columns:1.05fr 1.35fr;
   gap:10px;
-  margin-top: 8px;
+  margin-top:8px;
 }
 
 /* =========================
@@ -242,8 +248,12 @@ html, body{
   font-size:11.5px;
   line-height:1.25;
 }
-.col1{ width: 32%; border-right:1px solid var(--border); font-weight:800; }
-.col2{ width: 68%; }
+.col1{
+  width:32%;
+  border-right:1px solid var(--border);
+  font-weight:800;
+}
+.col2{ width:68%; }
 
 /* =========================
    CTA
@@ -252,47 +262,54 @@ html, body{
   margin-top:10px;
   border:1px solid var(--border);
   border-radius:14px;
-  padding:12px 12px;
+  padding:12px;
   background:#fff;
 }
 .cta__headline{
   font-weight:900;
   font-size:13.5px;
-  color: var(--text);
+  color:var(--text);
 }
 .cta__body{
   margin-top:6px;
   font-size:12px;
-  color: var(--text);
+  color:var(--text);
 }
 
 /* =========================
-   Planner (무조건 왼쪽 정렬)
+   Planner (항상 왼쪽 정렬)
    ========================= */
 .planner{ margin-top:10px; }
+
 .planner-box{
   border:1px solid var(--border);
   border-radius:14px;
-  padding:12px 12px;
-  background: var(--card);
+  padding:12px;
+  background:var(--card);
 }
+
 .planner-title{
   font-size:11px;
   font-weight:700;
-  color: var(--muted);
+  color:var(--muted);
 }
+
 .planner-name{
   margin-top:6px;
   font-size:15px;
   font-weight:900;
-  color: var(--blue);
+  color:var(--blue);
 }
-.planner-org, .planner-phone, .planner-email{
+
+.planner-org,
+.planner-phone,
+.planner-email{
   margin-top:3px;
   font-size:11.5px;
   color:#374151;
-  text-align:left;   /* 핵심: PDF/화면 동일 */
+  text-align:left; /* 화면/PDF 동일 */
 }
+
 .planner-phone{ font-weight:700; }
 
 /* =========================
@@ -303,19 +320,31 @@ html, body{
   padding-top:8px;
   border-top:1px solid var(--border);
 }
-.footer__disclaimer, .footer__legal{
+.footer__disclaimer,
+.footer__legal{
   font-size:10px;
-  color: var(--muted);
+  color:var(--muted);
   line-height:1.35;
 }
 
-/* PDF에서 쪼개짐 방지 */
-.header, .card, .table, .cta, .planner-box, .footer{ break-inside: avoid; }
+/* =========================
+   PDF page-break control
+   ========================= */
+.header,
+.card,
+.table,
+.cta,
+.planner-box,
+.footer{
+  break-inside:avoid;
+}
 
-/* 정말 작은 화면에서만 */
-@media (max-width: 520px){
-  .header{ grid-template-columns: 1fr; }
+/* =========================
+   Small screens only
+   ========================= */
+@media (max-width:520px){
+  .header{ grid-template-columns:1fr; }
   .header-right{ text-align:left; }
-  .cards{ grid-template-columns: 1fr; }
-  .grid2{ grid-template-columns: 1fr; }
+  .cards{ grid-template-columns:1fr; }
+  .grid2{ grid-template-columns:1fr; }
 }
