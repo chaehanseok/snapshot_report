@@ -98,22 +98,23 @@
       <div class="planner-box">
         <div class="planner-title">상담 및 보장 점검 문의</div>
 
-        <div class="planner-name">{{ planner.name }} FC</div>
+        <div class="planner-name">{{ planner.name }}</div>
         <div class="planner-org">{{ planner.org_display }}</div>
 
         <div class="planner-row">
-          <div class="planner-label">연락처</div>
-          <div class="planner-value">{{ planner.phone_display }}</div>
+          <span class="planner-label">연락처 :</span>
+          <span class="planner-text">{{ planner.phone_display }}</span>
         </div>
 
         {% if planner.email %}
         <div class="planner-row">
-          <div class="planner-label">이메일</div>
-          <div class="planner-value">{{ planner.email }}</div>
+          <span class="planner-label">이메일 :</span>
+          <span class="planner-text">{{ planner.email }}</span>
         </div>
         {% endif %}
       </div>
     </section>
+
 
     <!-- Footer -->
     <footer class="footer">

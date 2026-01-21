@@ -1,44 +1,9 @@
 /* =========================
    Print/PDF Page (WeasyPrint)
    ========================= */
-/* PDF는 @page로, 화면은 .page로 맞춘다 */
 @page{
   size: A4;
-  margin: 0;          /* 핵심: PDF 여백은 .page padding으로 통일 */
-}
-
-/* 공통 */
-.page{
-  padding: 10mm;      /* 화면/PDF 모두 동일 여백 */
-}
-
-.topband{
-  height:10px;
-  background: linear-gradient(90deg, var(--blue) 0 82%, var(--orange) 82% 100%);
-  border-radius:6px;
-  margin-bottom:10px;
-}
-
-/* ===== screen에서 A4 폭 강제 ===== */
-@media screen{
-  body{
-    background:#f3f4f6;           /* 바깥은 약간 회색 */
-  }
-  .page{
-    width: 210mm;                 /* A4 폭 고정 */
-    min-height: 297mm;            /* A4 높이 */
-    margin: 12px auto;            /* 가운데 정렬 */
-    background:#fff;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-    border-radius: 10px;
-  }
-}
-
-/* ===== 기존 모바일 반응형은 '정말 작은 화면'에서만 ===== */
-@media (max-width: 520px){
-  .header{ flex-direction:column; align-items:flex-start; }
-  .docmeta{ text-align:left; }
-  .cards{ grid-template-columns: 1fr; }
+  margin: 0;                 /* PDF 여백 0 */
 }
 
 /* =========================
@@ -50,8 +15,8 @@
   --border:#e5e7eb;
   --bg:#ffffff;
   --card:#f8fafc;
-  --blue:#0B3A73;     /* 미래에셋 계열 블루 톤 */
-  --orange:#F59E0B;   /* 포인트 */
+  --blue:#0B3A73;            /* Mirae Asset Blue tone */
+  --orange:#F59E0B;          /* Accent */
 }
 
 @font-face{
@@ -67,7 +32,6 @@
   font-style:normal;
 }
 
-/* Reset */
 *{ box-sizing:border-box; }
 html, body{
   margin:0;
@@ -76,26 +40,54 @@ html, body{
   color:var(--text);
   font-family:"NotoSansKR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
               "Malgun Gothic","Segoe UI", Roboto, Arial, sans-serif;
-  line-height:1.38; /* 1page 맞추려면 1.45보다 살짝 타이트 */
-}
-  
-/* Keep layout stable between preview and pdf */
-.page{
-  width: 100%;
-  padding: 0;
+  line-height:1.38;          /* 1page 안정화 */
 }
 
-/* ===== Top Band (report 느낌 핵심) ===== */
+/* =========================
+   Layout (핵심: 화면/PDF 동일 기준)
+   ========================= */
+.page{
+  width: 100%;
+  padding: 10mm;             /* 여백은 여기서 단일 관리 */
+}
+
+/* ===== screen에서 A4 폭 강제 (PDF에는 영향 없음) ===== */
+@media screen{
+  body{ background:#f3f4f6; }
+  .page{
+    width: 210mm;
+    min-height: 297mm;
+    margin: 12px auto;
+    background:#fff;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    border-radius: 10px;
+  }
+}
+
+/* ===== 모바일 반응형: 정말 작은 화면에서만 ===== */
+@media (max-width: 520px){
+  .header{ grid-template-columns:1fr; }
+  .header-right{ text-align:left; }
+  .cards{ grid-template-columns: 1fr; }
+  .grid2{ grid-template-columns: 1fr; }
+}
+
+/* =========================
+   Top Band
+   ========================= */
 .topband{
   height: 10px;
   background: linear-gradient(90deg, var(--blue) 0 82%, var(--orange) 82% 100%);
   border-radius: 6px;
+  margin-bottom: 10px;
 }
 
-/* ===== Header ===== */
+/* =========================
+   Header
+   ========================= */
 .header{
   display:grid;
-  grid-template-columns: 1fr 170px; /* 좌측 콘텐츠 / 우측 로고 */
+  grid-template-columns: 1fr 170px;
   gap:14px;
   align-items:start;
   padding:10px 0 8px 0;
@@ -103,10 +95,6 @@ html, body{
   margin-bottom:10px;
 }
 
-
-.header-left{
-  min-width: 260px;
-}
 .label{
   font-weight:800;
   font-size:12px;
@@ -129,16 +117,10 @@ html, body{
   color: var(--muted);
 }
 
-.header-right{
-  text-align:right;
-  /* min-width: 160px; */
-}
-.logo{
-  display:flex;
-  justify-content:flex-end;
-}
+.header-right{ text-align:right; }
+.logo{ display:flex; justify-content:flex-end; }
 .logo img{
-  height: 26px;      /* 너무 크면 1page 깨짐 */
+  height: 26px;
   width: auto;
   object-fit: contain;
 }
@@ -148,41 +130,40 @@ html, body{
   color: var(--muted);
 }
 
-.meta-inline{
-  margin-top:8px;
-  font-size:11px;
-  color:var(--muted);
-}
-
-
-/* ===== Section Title ===== */
-.section{
-  margin-top: 10px;
-}
+/* =========================
+   Section Title
+   ========================= */
+.section{ margin-top:10px; }
 .section-title{
   display:flex;
   align-items:center;
   gap:8px;
-  margin: 0 0 6px 0;
+  margin:0 0 6px 0;
   font-size:12px;
   font-weight:800;
 }
 .section-title::before{
   content:"";
-  width: 6px;
-  height: 14px;
-  background: var(--blue);
-  border-radius: 3px;
+  width:6px;
+  height:14px;
+  background:var(--blue);
+  border-radius:3px;
 }
 
-/* ===== Bullets ===== */
-.bullets{
+/* =========================
+   Lists (marker 유령 제거)
+   ========================= */
+.bullets, .questions{
+  list-style:none;
+  padding-left:0;
   margin:0;
-  padding-left:18px;
 }
-.bullets li{ margin: 5px 0; }
+.bullets li, .questions li{ margin:5px 0; }
+.bullets li::before, .questions li::before{ content:none !important; }
 
-/* ===== Cards ===== */
+/* =========================
+   Cards
+   ========================= */
 .cards{
   display:grid;
   grid-template-columns: repeat(3, 1fr);
@@ -193,7 +174,7 @@ html, body{
   border-radius:12px;
   padding:10px 10px;
   background: var(--card);
-  min-height: 84px;       /* 기존 92px → 압축 */
+  min-height: 84px;
 }
 .card__title{
   font-size:11px;
@@ -212,19 +193,15 @@ html, body{
   color: var(--muted);
 }
 
-/* ===== Questions + Table as 2-column grid ===== */
+/* =========================
+   Questions + Table grid
+   ========================= */
 .grid2{
   display:grid;
-  grid-template-columns: 1.05fr 1.35fr; /* 오른쪽 표 비중 조금 더 */
+  grid-template-columns: 1.05fr 1.35fr;
   gap:10px;
-  margin-top: 8px;
+  margin-top:8px;
 }
-
-.questions{
-  margin:0;
-  padding-left:18px;
-}
-.questions li{ margin: 6px 0; }
 
 /* Table */
 .table{
@@ -246,10 +223,12 @@ html, body{
   font-size:11.5px;
   line-height:1.25;
 }
-.col1{ width: 32%; border-right:1px solid var(--border); font-weight:800; }
-.col2{ width: 68%; }
+.col1{ width:32%; border-right:1px solid var(--border); font-weight:800; }
+.col2{ width:68%; }
 
-/* ===== CTA ===== */
+/* =========================
+   CTA
+   ========================= */
 .cta{
   margin-top:10px;
   border:1px solid var(--border);
@@ -267,10 +246,10 @@ html, body{
   color: var(--text);
 }
 
-/* ===== Planner ===== */
-.planner{
-  margin-top:10px;
-}
+/* =========================
+   Planner (핵심: PDF/화면 동일)
+   ========================= */
+.planner{ margin-top:10px; }
 .planner-box{
   border:1px solid var(--border);
   border-radius:14px;
@@ -288,28 +267,26 @@ html, body{
   font-weight:900;
   color: var(--blue);
 }
-.planner-org, .planner-phone, .planner-email{
-  margin-top:3px;
-  font-size:11.5px;
-  color:#374151;
-}
-.planner-phone{
-  text-align:right;     /* 요청: 연락처 오른쪽 정렬 */
-  font-weight:700;
-}
+.planner-org{ margin-top:3px; font-size:11.5px; color:#374151; }
 
 .planner-row{
-  display:grid;
-  grid-template-columns: 64px 1fr;
-  gap:8px;
-  margin-top:3px;
+  margin-top:4px;
   font-size:11.5px;
   color:#374151;
 }
-.planner-label{ color:var(--muted); font-weight:700; }
-.planner-value{ text-align:right; font-weight:700; } /* 값만 우측정렬 */
+.planner-label{
+  color:var(--muted);
+  font-weight:600;
+  margin-right:6px;
+}
+.planner-text{
+  font-weight:700;
+  white-space:nowrap;          /* PDF 줄찢김 방지 */
+}
 
-/* ===== Footer ===== */
+/* =========================
+   Footer
+   ========================= */
 .footer{
   margin-top:10px;
   padding-top:8px;
@@ -321,5 +298,5 @@ html, body{
   line-height:1.35;
 }
 
-/* Avoid weird page breaks in PDF */
+/* PDF page break 안정화 */
 .header, .card, .table, .cta, .planner-box, .footer{ break-inside: avoid; }
