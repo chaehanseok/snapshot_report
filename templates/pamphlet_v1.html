@@ -73,6 +73,15 @@
       </ul>
     </section>
 
+    <!-- 통계 기준 및 산출 설명 (1페이지 하단) -->
+    <section class="section stats-footer">
+      <ul class="footnotes">
+        {% for note in stats.footnotes %}
+          <li>{{ note }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+
   </div>
 
   <!-- =========================

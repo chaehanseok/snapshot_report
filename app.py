@@ -994,12 +994,21 @@ context = {
     # =========================
     "stats": {
         "base_year": f"{start_year}~{end_year}",
-        "source": stats_db.get(
-            "source",
-            "보건의료빅데이터개방시스템 - 건강보험심사평가원(요약)",
+        # 🔹 상단 기준 문구 (헤더에 표시)
+        "source": (
+            "통계 - 보건의료빅데이터개방시스템 (건강보험심사평가원), "
+            "대상질병 - 미래에셋생명 언더라이팅 대표질병코드"
         ),
+
         "top7_basis": sort_label,
         "chart_data_uri": chart_data_uri,   # 현재 연령대 차트
+        # 🔹 1페이지 하단 footer용 설명
+        "footnotes": [
+            "진료비 : 건강보험 요양급여비용 (비급여 및 그 외 부수비용(휴업 손해 등) 제외)",
+            "총 진료비 : 해당 기간, 해당 연령대에 발생한 전체 진료비",
+            f"본 통계는 최소 유병률(10만명당) {min_prev_100k}, "
+            f"최소 1인당 진료비(만원) {min_cpp_manwon}을 기준으로 산출하였습니다."
+        ],
     },
     "current_table": render_table_html(top_rows),
 
