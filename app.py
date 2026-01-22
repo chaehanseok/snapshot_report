@@ -302,7 +302,7 @@ def build_top10_combo_chart_data_uri(
         aux2 = ("연평균 총 진료비", cost_avg_eok, "억", MIRAE_BLUE, "bottom")
 
     plt.close("all")
-    fig, ax = plt.subplots(figsize=(12.5, 5.8), dpi=200)
+    fig, ax = plt.subplots(figsize=(12.5, 8.2), dpi=200)
 
     ax.barh(y, bar_vals)
     ax.set_yticks(y)
@@ -367,7 +367,7 @@ def build_top10_combo_chart_data_uri(
     fig.suptitle(title, fontsize=14, fontweight="bold")
     ax.legend(handles=[h_top, h_bot], loc="lower right", frameon=True)
 
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.tight_layout(rect=[0, 0.02, 1, 0.95])
 
     buf = BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
@@ -761,6 +761,10 @@ age_group = AGE_GROUP_MAP.get(age_band, "50_59")
 sex = "M" if gender == "남성" else "F"
 sex_display = "남성" if sex == "M" else "여성"
 
+TABLE_ROW_HEIGHT = 35
+TABLE_HEADER = 40
+TABLE_HEIGHT = TABLE_HEADER + TABLE_ROW_HEIGHT * 15
+
 st.markdown("---")
 st.markdown("#### 고객 연령대 통계 (현재)")
 
@@ -801,6 +805,7 @@ with st.expander("통계 상세 (Top15 테이블) - 현재 연령대"):
         ],
         use_container_width=True,
         hide_index=True,
+        height=TABLE_HEIGHT,
     )
 
 # -------------------------
@@ -847,6 +852,7 @@ if after_groups and after_rows:
             ],
             use_container_width=True,
             hide_index=True,
+            height=TABLE_HEIGHT,
         )
 else:
     if after_groups:
@@ -873,6 +879,7 @@ if emerging_rows:
             ],
             use_container_width=True,
             hide_index=True,
+            height=TABLE_HEIGHT,
         )
 else:
     st.info("현재 Top15에 없는 ‘신규 부각 질병’이 없습니다. (현재와 이후가 유사한 패턴)")
