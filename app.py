@@ -232,12 +232,7 @@ def build_top7_combo_chart_data_uri(
     basis: str,
 ) -> str:
     """
-    ✅ 옵션2: 상단축 제거
-      - 막대(기준) = 왼쪽 Y축
-      - 선 2개(나머지 지표 2개) = 오른쪽 Y축 2개(스파인 오프셋)
-    ✅ 선 색상: 미래에셋 톤(네이비/오렌지)
-
-    rows:
+    rows: fetch_top_rows() 결과
       - disease_code
       - disease_name_ko
       - patient_cnt (명)
@@ -245,9 +240,9 @@ def build_top7_combo_chart_data_uri(
       - cost_per_patient (천원)
 
     basis:
-      - "total_cost"        : 막대=총진료비(기간합)
-      - "patient_cnt"       : 막대=환자수(기간합)
-      - "cost_per_patient"  : 막대=1인당 진료비(기간평균)
+      - "total_cost"        : 총진료비(기간합)
+      - "patient_cnt"       : 환자수(기간합)
+      - "cost_per_patient"  : 1인당 진료비(기간평균)
     """
     from io import BytesIO
     import base64
@@ -257,14 +252,8 @@ def build_top7_combo_chart_data_uri(
     if not rows:
         return ""
 
-    # ✅ 한글 폰트
+    # ✅ 한글 폰트 (너가 만든 안전 버전이면 여기서 호출)
     configure_matplotlib_korean_font()
-
-    # -----------------------
-    # Brand colors (Mirae Asset-like)
-    # -----------------------
-    MA_NAVY = "#003A70"
-    MA_ORANGE = "#F58220"
 
     # -----------------------
     # Unit conversions
@@ -278,13 +267,14 @@ def build_top7_combo_chart_data_uri(
         return float(x or 0) / 10.0
 
     # -----------------------
-    # Prepare values
+    # Prepare labels/values
     # -----------------------
     labels = []
-    total_cost_eok = []
     patient_cnt = []
+    total_cost_eok = []
     cpp_man = []
 
+    # rows는 DESC 정렬(Top1~Top7)이라고 가정
     for r in rows:
         code = (r.get("disease_code") or "").strip()
         name = (r.get("disease_name_ko") or "").strip() or code or "질병"
@@ -294,88 +284,90 @@ def build_top7_combo_chart_data_uri(
         total_cost_eok.append(to_억원_from_천원(float(r.get("total_cost") or 0)))
         cpp_man.append(to_만원_from_천원(float(r.get("cost_per_patient") or 0)))
 
-    # Top1이 먼저 보이게(좌→우 정렬이 더 직관적이라 reverse 안 함)
-    x = list(range(len(labels)))
+    # -----------------------
+    # Choose bar metric by basis
+    # -----------------------
+    if basis == "total_cost":
+        bar_vals = total_cost_eok
+        bar_label = "총 진료비(기간합) [억원]"
+        bar_value_fmt = lambda v: f"{v:.1f}억"
+    elif basis == "patient_cnt":
+        bar_vals = patient_cnt
+        bar_label = "환자수(기간합) [명]"
+        bar_value_fmt = lambda v: f"{int(v):,}명"
+    else:
+        bar_vals = cpp_man
+        bar_label = "1인당 진료비(기간평균) [만원]"
+        bar_value_fmt = lambda v: f"{v:.1f}만"
+
+    # 선은 항상 2개: 총진료비(억원) + 1인당(만원)
+    line1_vals = total_cost_eok
+    line1_label = "총 진료비(기간합) [억원]"
+
+    line2_vals = cpp_man
+    line2_label = "1인당 진료비(기간평균) [만원]"
 
     # -----------------------
-    # Choose bar/line mapping
-    # -----------------------
-    metrics = {
-        "total_cost": ("총 진료비(기간합) [억원]", total_cost_eok, FuncFormatter(lambda v, p=None: f"{v:.1f}")),
-        "patient_cnt": ("환자수(기간합) [명]", patient_cnt, FuncFormatter(lambda v, p=None: f"{int(v):,}")),
-        "cost_per_patient": ("1인당 진료비(기간평균) [만원]", cpp_man, FuncFormatter(lambda v, p=None: f"{v:.1f}")),
-    }
-
-    if basis not in metrics:
-        basis = "total_cost"
-
-    bar_label, bar_vals, bar_fmt = metrics[basis]
-
-    other_keys = [k for k in metrics.keys() if k != basis]
-    k1, k2 = other_keys[0], other_keys[1]
-
-    line1_label, line1_vals, line1_fmt = metrics[k1]
-    line2_label, line2_vals, line2_fmt = metrics[k2]
-
-    # -----------------------
-    # Plot (No top axes)
+    # Plot (Vertical bar + 2 lines, 3 y-axes)
     # -----------------------
     plt.close("all")
-    fig, ax = plt.subplots(figsize=(13.2, 5.6), dpi=200)
+    fig, ax_bar = plt.subplots(figsize=(12.8, 5.6), dpi=200)
 
-    # Bar (primary axis)
-    bars = ax.bar(x, bar_vals, alpha=0.88)
-    ax.set_ylabel(bar_label)
-    ax.yaxis.set_major_formatter(bar_fmt)
-    ax.grid(axis="y", linestyle="--", alpha=0.25)
+    x = list(range(len(labels)))
 
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels, rotation=20, ha="right")
+    # (브랜드 색상) 미래에셋 느낌: 네이비/오렌지
+    MA_NAVY = "#002E6D"
+    MA_ORANGE = "#F05A28"
 
-    # Right axis #1 for line1 (navy)
-    ax_r1 = ax.twinx()
-    l1 = ax_r1.plot(x, line1_vals, marker="o", linewidth=2.4, color=MA_NAVY, label=line1_label)
-    ax_r1.set_ylabel(line1_label, color=MA_NAVY)
-    ax_r1.yaxis.set_major_formatter(line1_fmt)
-    ax_r1.tick_params(axis="y", colors=MA_NAVY)
+    # 막대 (메인 지표)
+    bars = ax_bar.bar(x, bar_vals, alpha=0.95)
+    ax_bar.set_ylabel(bar_label)
+    ax_bar.set_xticks(x)
+    ax_bar.set_xticklabels(labels, rotation=25, ha="right")
+    ax_bar.grid(axis="y", linestyle="--", alpha=0.35)
 
-    # Right axis #2 for line2 (orange) - offset spine
-    ax_r2 = ax.twinx()
-    ax_r2.spines["right"].set_position(("axes", 1.10))  # 살짝 오른쪽으로
-    l2 = ax_r2.plot(x, line2_vals, marker="o", linewidth=2.4, linestyle="--", color=MA_ORANGE, label=line2_label)
-    ax_r2.set_ylabel(line2_label, color=MA_ORANGE)
-    ax_r2.yaxis.set_major_formatter(line2_fmt)
-    ax_r2.tick_params(axis="y", colors=MA_ORANGE)
+    # ✅ 메인 지표 축 숫자 제거 (요구사항)
+    ax_bar.set_yticklabels([])
+    ax_bar.tick_params(axis="y", length=0)
 
-    # Legend: bar + lines
-    # bar는 대표 handle 1개만
-    bar_proxy = bars[0]
-    handles = [bar_proxy, l1[0], l2[0]]
-    labels_legend = [bar_label, line1_label, line2_label]
-    ax.legend(handles, labels_legend, loc="upper left", frameon=True)
-
-    # Value labels: 막대 위에 3지표 요약
-    def safe_int(v): 
-        try: return int(round(float(v)))
-        except: return 0
-
-    for i in range(len(x)):
-        tc = total_cost_eok[i]
-        pc = patient_cnt[i]
-        cp = cpp_man[i]
-
-        ax.text(
-            x[i],
-            bar_vals[i],
-            f"{tc:.1f}억 · {safe_int(pc):,}명 · {cp:.1f}만",
+    # 값 라벨은 막대 위에 직접 표시
+    for i, (b, v) in enumerate(zip(bars, bar_vals)):
+        ax_bar.text(
+            b.get_x() + b.get_width() / 2,
+            b.get_height(),
+            bar_value_fmt(v),
             ha="center",
             va="bottom",
             fontsize=9,
             rotation=0,
         )
 
+    # 보조축1 (오른쪽) - 총진료비(억원)
+    ax_r1 = ax_bar.twinx()
+    ln1 = ax_r1.plot(x, line1_vals, marker="o", linewidth=2.2, color=MA_NAVY, label=line1_label)
+    ax_r1.set_ylabel(line1_label, color=MA_NAVY)
+    ax_r1.tick_params(axis="y", labelcolor=MA_NAVY)
+
+    # 보조축2 (오른쪽 바깥쪽) - 1인당(만원)
+    ax_r2 = ax_bar.twinx()
+    ax_r2.spines["right"].set_position(("outward", 52))  # ✅ 두번째 오른쪽 축을 바깥으로
+    ln2 = ax_r2.plot(x, line2_vals, marker="o", linewidth=2.2, color=MA_ORANGE, label=line2_label)
+    ax_r2.set_ylabel(line2_label, color=MA_ORANGE)
+    ax_r2.tick_params(axis="y", labelcolor=MA_ORANGE)
+
+    # 라인 값도 너무 빡빡하면 안 찍고 싶을 수 있어서(지금은 범례만)
+    # 필요하면 아래처럼 점 옆에 라벨을 추가할 수 있음:
+    # for i, v in enumerate(line1_vals): ax_r1.text(i, v, f"{v:.1f}", fontsize=8, color=MA_NAVY)
+
+    # 범례(막대 + 선2개)
+    # 막대는 proxy artist로 넣음
+    bar_proxy = bars[0]
+    handles = [bar_proxy, ln1[0], ln2[0]]
+    labels_legend = [bar_label, line1_label, line2_label]
+    ax_bar.legend(handles, labels_legend, loc="upper left", frameon=True)
+
     fig.suptitle(title, fontsize=14, fontweight="bold")
-    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
 
     buf = BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
@@ -383,8 +375,6 @@ def build_top7_combo_chart_data_uri(
 
     png_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{png_b64}"
-
-
 
 
 STAT_SORT_OPTIONS = {
