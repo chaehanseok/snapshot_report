@@ -457,13 +457,12 @@ def build_top7_combo_chart_data_uri(
     png_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{png_b64}"
 
-
-
 STAT_SORT_OPTIONS = {
     "총 진료비(연평균)": {"key": "total_cost"},
-    "유병률(10만명당)": {"key": "patient_cnt"},          # ✅ 내부키는 유지해도 되지만 의미는 유병률
+    "유병률(10만명당)": {"key": "prevalence_per_100k"},
     "1인당 진료비(기간평균)": {"key": "cost_per_patient"},
 }
+
 
 AFTER_AGE_GROUPS = {
     "20대": ["30_39", "40_49", "50_59", "60_69", "70_79", "80_plus"],
@@ -481,19 +480,18 @@ def fetch_top_rows(
     end_year: int,
     age_group: str,
     sex: str,
-    sort_key: str = "total_cost",
+    sort_key: str = "total_cost",  # total_cost | prevalence_per_100k | cost_per_patient
     limit: int = 10,
-    min_prev_100k: float | None = None,   # ✅ 유병률(10만명당)
-    min_cpp_chewon: int | None = None,    # ✅ 1인당(천원)
+    min_prev_100k: float | None = None,
+    min_cpp_chewon: int | None = None,
 ) -> list[dict]:
 
-    if sort_key not in ("total_cost", "patient_cnt", "cost_per_patient"):
+    if sort_key not in ("total_cost", "prevalence_per_100k", "cost_per_patient"):
         sort_key = "total_cost"
 
-    # ✅ patient_cnt 키는 '유병률'로 정렬
     order_by = {
         "total_cost": "total_cost DESC",
-        "patient_cnt": "prevalence_per_100k DESC",
+        "prevalence_per_100k": "prevalence_per_100k DESC",
         "cost_per_patient": "cost_per_patient DESC",
     }[sort_key]
 
@@ -520,12 +518,12 @@ def fetch_top_rows(
         m.disease_code AS disease_code,
         COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
 
-        SUM(m.patient_cnt) AS patient_cnt,        -- 기간합(명)
-        SUM(m.total_cost)  AS total_cost,         -- 기간합(천원)
-        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient,  -- 천원
+        SUM(m.total_cost)  AS total_cost, -- 기간합(천원)
+        SUM(m.patient_cnt) AS patient_cnt, -- 내부 계산용(표시하지 않을 예정)
+        SUM(m.population)  AS population,  -- 내부 계산용
 
-        SUM(m.population) AS population,          -- 기간합(명)
-        (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(SUM(m.population), 0)) * 100000.0 AS prevalence_per_100k
+        (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(SUM(m.population), 0)) * 100000.0 AS prevalence_per_100k,
+        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
       FROM disease_year_age_sex_metrics m
       LEFT JOIN disease d
         ON m.disease_code = d.disease_code
@@ -539,7 +537,6 @@ def fetch_top_rows(
     ORDER BY {order_by}
     LIMIT ?;
     """
-
     return d1_query(sql, params)
 
 
@@ -558,12 +555,12 @@ def fetch_top_rows_after_age(
     if not after_age_groups:
         return []
 
-    if sort_key not in ("total_cost", "patient_cnt", "cost_per_patient"):
+    if sort_key not in ("total_cost", "prevalence_per_100k", "cost_per_patient"):
         sort_key = "total_cost"
 
     order_by = {
         "total_cost": "total_cost DESC",
-        "patient_cnt": "prevalence_per_100k DESC",
+        "prevalence_per_100k": "prevalence_per_100k DESC",
         "cost_per_patient": "cost_per_patient DESC",
     }[sort_key]
 
@@ -592,12 +589,12 @@ def fetch_top_rows_after_age(
         m.disease_code AS disease_code,
         COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
 
-        SUM(m.patient_cnt) AS patient_cnt,
         SUM(m.total_cost)  AS total_cost,
-        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient,
+        SUM(m.patient_cnt) AS patient_cnt,
+        SUM(m.population)  AS population,
 
-        SUM(m.population) AS population,
-        (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(SUM(m.population), 0)) * 100000.0 AS prevalence_per_100k
+        (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(SUM(m.population), 0)) * 100000.0 AS prevalence_per_100k,
+        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
       FROM disease_year_age_sex_metrics m
       LEFT JOIN disease d
         ON m.disease_code = d.disease_code
@@ -611,7 +608,6 @@ def fetch_top_rows_after_age(
     ORDER BY {order_by}
     LIMIT ?;
     """
-
     return d1_query(sql, params)
 
 
@@ -888,15 +884,15 @@ sort_key = STAT_SORT_OPTIONS[sort_label]["key"]
 
 # ✅ 기준에 따라 추가 옵션(슬라이더) 노출
 # - 기본값: 환자수 100명, 1인당 100만원
-min_prev_100k = None
-min_cpp_chewon = None
+min_prev_100k: float | None = None
+min_cpp_chewon: int | None = None
 
 # 슬라이더 편의: 1인당 진료비(만원)로 입력 받고 -> 천원으로 변환
 def manwon_to_chewon(m: int) -> int:
     # 만원 -> 원: *10,000, 천원: /1,000 => 만원*10
     return int(m) * 10
 
-st.caption("조건 필터(선택): 기준이 총진료비/유병율(10만명당)/1인당 중 무엇이냐에 따라 입력 옵션이 달라집니다.")
+st.caption("조건 필터(선택): 기준이 총진료비/유병율(10만명당)/1인당 진료비 중 무엇이냐에 따라 입력 옵션이 달라집니다.")
 
 if sort_key == "total_cost":
     c1, c2 = st.columns(2)
@@ -906,8 +902,8 @@ if sort_key == "total_cost":
         min_cpp_manwon = st.slider("최소 1인당 진료비(만원)", 0, 5000, 100, 10)
         min_cpp_chewon = manwon_to_chewon(min_cpp_manwon)
 
-elif sort_key == "patient_cnt":  # ✅ 의미상 유병률
-    min_prev_100k = st.slider("최소 유병률(10만명당)", 0.0, 2000.0, 50.0, 5.0)
+elif sort_key == "prevalence_per_100k":
+    min_cpp_manwon = st.slider("최소 1인당 진료비(만원)", 0, 5000, 100, 10)
 
 else:  # cost_per_patient
     min_prev_100k = st.slider("최소 유병률(10만명당)", 0.0, 2000.0, 50.0, 5.0)
@@ -998,8 +994,8 @@ with st.expander("통계 상세 (Top10 테이블) - 현재 연령대"):
             {
                 "질병코드": r.get("disease_code"),
                 "질병명": r.get("disease_name_ko") or r.get("disease_code"),
-                "총진료비(연평균, 억원)": f"{annualize_total_cost_eok(r.get('total_cost')):,.1f}",
-                "환자수(연평균, 명)": f"{annualize_patient_cnt(r.get('patient_cnt')):,.0f}",
+                "총진료비(연평균, 억원)": f"{chewon_to_eok(r.get('total_cost')/years):,.1f}",
+                "유병률(10만명당)": f"{float(r.get('prevalence_per_100k') or 0):,.1f}",
                 "1인당 진료비(만원)": f"{chewon_to_man(r.get('cost_per_patient')):,.1f}",
             }
             for r in (top_rows or [])
@@ -1061,11 +1057,11 @@ if after_groups and after_rows:
                 {
                     "질병코드": r.get("disease_code"),
                     "질병명": r.get("disease_name_ko") or r.get("disease_code"),
-                    "총진료비(연평균, 억원)": f"{annualize_total_cost_eok(r.get('total_cost')):,.1f}",
+                    "총진료비(연평균, 억원)": f"{chewon_to_eok(r.get('total_cost')/years):,.1f}",
                     "유병률(10만명당)": f"{float(r.get('prevalence_per_100k') or 0):,.1f}",
                     "1인당 진료비(만원)": f"{chewon_to_man(r.get('cost_per_patient')):,.1f}",
                 }
-                for r in after_rows
+                for r in (top_rows or [])
             ],
             use_container_width=True,
             hide_index=True,
@@ -1086,12 +1082,11 @@ if emerging_rows:
                 {
                     "질병코드": r.get("disease_code"),
                     "질병명": r.get("disease_name_ko") or r.get("disease_code"),
-                    # ✅ 여기만 /years 하던 것 제거하고, 공통 함수로 통일
-                    "총진료비(연평균, 억원)": f"{annualize_total_cost_eok(r.get('total_cost')):,.1f}",
-                    "환자수(연평균, 명)": f"{annualize_patient_cnt(r.get('patient_cnt')):,.0f}",
+                    "총진료비(연평균, 억원)": f"{chewon_to_eok(r.get('total_cost')/years):,.1f}",
+                    "유병률(10만명당)": f"{float(r.get('prevalence_per_100k') or 0):,.1f}",
                     "1인당 진료비(만원)": f"{chewon_to_man(r.get('cost_per_patient')):,.1f}",
                 }
-                for r in emerging_rows
+                for r in (top_rows or [])
             ],
             use_container_width=True,
             hide_index=True,
