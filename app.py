@@ -11,8 +11,10 @@ from io import BytesIO
 import streamlit as st
 import streamlit.components.v1 as components
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+from matplotlib import font_manager as fm
 
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
@@ -160,6 +162,24 @@ def fetch_year_range() -> tuple[int, int]:
         return (2010, 2024)  # fallback
     return (int(row[0].get("min_year") or 2010), int(row[0].get("max_year") or 2024))
 
+# =========================================================
+# matplotlib font fix (Korean)
+# =========================================================
+
+def configure_matplotlib_korean_font():
+    reg = FONT_DIR / "NotoSansKR-Regular.ttf"
+    bold = FONT_DIR / "NotoSansKR-Bold.ttf"
+
+    if reg.exists():
+        fm.fontManager.addfont(str(reg))
+    if bold.exists():
+        fm.fontManager.addfont(str(bold))
+
+    if reg.exists():
+        font_name = fm.FontProperties(fname=str(reg)).get_name()
+        matplotlib.rcParams["font.family"] = font_name
+
+    matplotlib.rcParams["axes.unicode_minus"] = False
 
 # =========================================================
 # Stats helpers (Top N)
@@ -179,6 +199,8 @@ def build_top7_combo_chart_data_uri(rows: list[dict], title: str) -> str | None:
     """
     if not rows:
         return None
+    
+    configure_matplotlib_korean_font()  # ✅ 이 줄이 핵심
 
     names = [str(r.get("disease_name_ko") or r.get("disease_code") or "").strip() for r in rows]
     total_cost = [float(r.get("total_cost") or 0) for r in rows]
@@ -568,6 +590,9 @@ chart_title = f"Top7 질병 통계 ({start_year}~{end_year} · {age_band} · {se
 chart_data_uri = build_top7_combo_chart_data_uri(top_rows, chart_title)
 
 st.markdown("#### 통계 미리보기 (차트)")
+
+st.caption(f"matplotlib font = {matplotlib.rcParams['font.family']}")
+
 if chart_data_uri:
     # Streamlit에서는 data uri 바로 st.image 가능
     st.image(chart_data_uri)
