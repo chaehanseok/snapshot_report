@@ -302,7 +302,7 @@ def build_top10_combo_chart_data_uri(
         aux2 = ("연평균 총 진료비", cost_avg_eok, "억", MIRAE_BLUE, "bottom")
 
     plt.close("all")
-    fig, ax = plt.subplots(figsize=(12.5, 8.2), dpi=200)
+    fig, ax = plt.subplots(figsize=(12.5, 10.0), dpi=300)
 
     ax.barh(y, bar_vals)
     ax.set_yticks(y)
@@ -791,7 +791,7 @@ if chart_data_uri:
 else:
     st.warning("차트를 만들 데이터가 없습니다. 조건을 바꿔보세요.")
 
-with st.expander("통계 상세 (Top15 테이블) - 현재 연령대"):
+with st.expander("통계 상세 (Top15 테이블) - 현재 연령대",expanded=True):
     st.dataframe(
         [
             {
@@ -838,7 +838,7 @@ if after_groups and after_rows:
     )
     st.image(base64.b64decode(after_chart_uri.split(",", 1)[1]))
 
-    with st.expander("통계 상세 (Top15 테이블) - 이후 연령대 합산"):
+    with st.expander("통계 상세 (Top15 테이블) - 이후 연령대 합산",expanded=True):
         st.dataframe(
             [
                 {
