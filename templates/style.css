@@ -370,11 +370,36 @@ html, body{
    ========================= */
 .planner{ margin-top:10px; }
 
-.planner-box{
-  border:1px solid var(--border);
-  border-radius:14px;
-  padding:12px;
-  background:var(--card);
+.planner-box {
+  background: #f6f8fa;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+}
+/* 박스 헤더 */
+.planner-header {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+/* 본문 정렬 */
+.planner-body {
+  line-height: 1.5;
+}
+
+.planner-main {
+  margin-bottom: 2px;
+}
+
+.planner-org {
+  color: #555;
+  margin-left: 4px;
+}
+
+.planner-contact {
+  color: #333;
+  font-size: 12px;
 }
 
 .planner-title{
@@ -528,4 +553,16 @@ html, body{
   padding: 10px 12px;
   background: #f6f8fa;
   border-radius: 6px;
+}
+
+/* 2페이지 상단 로고 */
+.page-logo {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 20px 18px 20px; /* 위-좌우-아래 */
+}
+
+.page-logo img {
+  height: 28px;
+  object-fit: contain;
 }
