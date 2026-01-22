@@ -375,7 +375,7 @@ def build_top7_combo_chart_data_uri(
     ax_top.spines["top"].set_position(("axes", 1.02))
 
     # ✅ 핵심: -0.10 → -0.02 (거의 붙이는 느낌)
-    ax_bottom.spines["bottom"].set_position(("axes", -0.02))
+    ax_bottom.spines["bottom"].set_position(("axes", -0.01))  # 더 붙임
 
     ax_bottom.xaxis.set_ticks_position("bottom")
     ax_bottom.xaxis.set_label_position("bottom")
