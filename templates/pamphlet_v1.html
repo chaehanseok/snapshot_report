@@ -53,7 +53,7 @@
 
         {% if stats.chart_data_uri %}
           <div class="chart-box">
-            <img class="chart-img" src="{{ stats.chart_data_uri }}" alt="Top7 통계 차트" />
+            <img class="stats-chart" src="{{ stats.chart_data_uri }}" alt="Top7 통계 차트" />
             <div class="note">
               * 기준: {{ stats.base_year }} · {{ stats.source }} · Top7 기준: {{ stats.top7_basis }}
             </div>
@@ -67,7 +67,7 @@
             * 위 내용은 동일 연령·성별 집단의 통계 기반 요약이며, 개인별 상황에 따라 달라질 수 있습니다.
           </div>
       </section>
-      
+
       <section class="section">
         <div class="grid2">
           <div>

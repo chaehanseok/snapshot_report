@@ -214,6 +214,8 @@ def build_top7_combo_chart_data_uri(
     import matplotlib.pyplot as plt
     from matplotlib.ticker import FuncFormatter
 
+    configure_matplotlib_korean_font()
+
     if not rows:
         return ""
 
@@ -673,8 +675,8 @@ chart_data_uri = build_top7_combo_chart_data_uri(
 st.markdown("#### 통계 미리보기 (차트)")
 
 if chart_data_uri:
-    # Streamlit에서는 data uri 바로 st.image 가능
-    st.image(chart_data_uri)
+    b64 = chart_data_uri.split(",", 1)[1]
+    st.image(base64.b64decode(b64))
 else:
     st.warning("차트를 만들 데이터가 없습니다. 조건을 바꿔보세요.")
 
