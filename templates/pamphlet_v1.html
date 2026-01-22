@@ -84,27 +84,8 @@
        PAGE 2 : 준비해야 할 것
        ========================= -->
   <div class="page">
-
-  <header class="header header--secondary">
-  <div class="header-left">
-    <div class="label">LIFE REPORT</div>
-    <div class="title">
-      {{ customer.name }} 고객님을 위한<br/>
-      <strong>{{ customer.age_band }} · {{ customer.gender }}</strong> 보장 점검 안내
-    </div>
-    <div class="meta-inline">
-      기준연도 {{ stats.base_year }} · {{ stats.source }} · v{{ version }}
-    </div>
-  </div>
-
-  <div class="header-right">
-    <div class="logo">
-      {% if logo_data_uri %}
-        <img src="{{ logo_data_uri }}" alt="Mirae Asset" />
-      {% endif %}
-    </div>
-  </div>
-  </header>
+    <!-- 상단 브랜드 바만 유지 -->
+    <div class="topband"></div>
 
     <!-- 이후 연령대 -->
     <section class="section">
