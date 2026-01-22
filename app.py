@@ -1086,7 +1086,6 @@ if after_groups and after_rows:
         basis=sort_key,
     )
 
-    st.markdown("### 이후 연령대(미래 위험) 통계")
     st.image(base64.b64decode(after_chart_uri.split(",", 1)[1]))
 
     # ✅ 이후 연령대 합산 Top10 테이블도 추가
