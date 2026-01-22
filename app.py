@@ -1,3 +1,10 @@
+# =========================================================
+# 최종 통합본 (유병률 기반 + 1인당 진료비 조건필터 + 현재/미래/신규부각 연동)
+# - Top10 기준: 총진료비(연평균) / 유병률(10만명당) / 1인당 진료비(기간평균)
+# - 조건필터: (모든 기준에서) 최소 유병률 + 최소 1인당 진료비 적용
+# - 현재 연령대 / 이후 연령대(미래 위험) / 신규 부각 질병(현재 Top10에 없음) 모두 동일 조건을 따라감
+# =========================================================
+
 import base64, json, hmac, hashlib, time, re
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -8,7 +15,6 @@ import sys
 import subprocess
 import requests
 from io import BytesIO
-import base64
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -21,17 +27,13 @@ from matplotlib import font_manager as fm
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
 # =========================================================
-PW_DIR = Path("/tmp/pw-browsers")  # Streamlit Cloud에서 가장 안전(쓰기 가능)
+PW_DIR = Path("/tmp/pw-browsers")
 PW_DIR.mkdir(parents=True, exist_ok=True)
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(PW_DIR)
 
 
 @st.cache_resource(show_spinner=False)
 def ensure_playwright_chromium() -> bool:
-    """
-    Streamlit Cloud에서는 playwright 패키지 설치만으로는 브라우저 바이너리가 없음.
-    최초 1회만 chromium 다운로드 후 캐시됨.
-    """
     browsers_path = Path(os.environ["PLAYWRIGHT_BROWSERS_PATH"])
     has_chrome = any(browsers_path.glob("**/chrome-headless-shell")) or any(browsers_path.glob("**/chromium*"))
     if not has_chrome:
@@ -60,6 +62,7 @@ FONT_DIR = ASSETS_DIR / "fonts"
 LOGO_PATH = ASSETS_DIR / "ma_logo.png"
 
 SECRET = st.secrets.get("GATEWAY_SECRET", "")
+
 
 # =========================================================
 # Token helpers
@@ -120,8 +123,10 @@ def segment_key(age_band: str, gender: str) -> str:
         a = "40"
     elif age_band.startswith("50"):
         a = "50"
-    else:
+    elif age_band.startswith("60"):
         a = "60"
+    else:
+        a = "70"
     g = "M" if gender == "남성" else "F"
     return f"{a}_{g}"
 
@@ -130,12 +135,6 @@ def segment_key(age_band: str, gender: str) -> str:
 # D1 query (Cloudflare D1 REST API)
 # =========================================================
 def d1_query(sql: str, params: list) -> list[dict]:
-    """
-    secrets 필요:
-      CF_ACCOUNT_ID
-      CF_API_TOKEN
-      D1_DATABASE_ID
-    """
     account_id = st.secrets["CF_ACCOUNT_ID"]
     api_token = st.secrets["CF_API_TOKEN"]
     db_id = st.secrets["D1_DATABASE_ID"]
@@ -156,59 +155,43 @@ def d1_query(sql: str, params: list) -> list[dict]:
         return []
     return blocks[0].get("results", [])
 
+
 @st.cache_data(show_spinner=False, ttl=3600)
 def fetch_year_range() -> tuple[int, int]:
     row = d1_query("SELECT MIN(year) AS min_year, MAX(year) AS max_year FROM disease_year_age_sex_metrics;", [])
     if not row:
-        return (2010, 2024)  # fallback
+        return (2010, 2024)
     return (int(row[0].get("min_year") or 2010), int(row[0].get("max_year") or 2024))
+
 
 # =========================================================
 # matplotlib font fix (Korean)
 # =========================================================
-
 @st.cache_resource(show_spinner=False)
 def configure_matplotlib_korean_font() -> str:
-    """
-    Matplotlib 한글 폰트 설정을 '절대 안 죽게' 구성.
-    - 폰트 파일이 0바이트/손상/파싱 실패하면 스킵
-    - 최소 1개라도 성공하면 그 폰트를 matplotlib 기본으로 지정
-    - 모두 실패하면 기본 폰트(DejaVu Sans)로 fallback
-    반환: 최종 적용된 font family name
-    """
-    import matplotlib
-    from matplotlib import font_manager as fm
-
     reg = FONT_DIR / "NotoSansKR-Regular.ttf"
     bold = FONT_DIR / "NotoSansKR-Bold.ttf"
 
     def is_valid_ttf(p: Path) -> bool:
         try:
-            # 0바이트/이상치 방어: 정상 ttf면 보통 수백 KB 이상
             return p.exists() and p.is_file() and p.stat().st_size > 100_000
         except Exception:
             return False
 
     loaded_font_name = None
-
-    # 후보를 순서대로 시도 (Regular 우선)
     for p in [reg, bold]:
         if not is_valid_ttf(p):
             continue
         try:
             fm.fontManager.addfont(str(p))
-            # addfont 성공했으면 이 파일의 실제 폰트명을 얻어서 family로 지정
             loaded_font_name = fm.FontProperties(fname=str(p)).get_name()
             break
         except Exception:
-            # 파싱 실패(FT2Font)면 그냥 스킵하고 다음 후보 시도
             continue
 
-    # 최종 적용
     if loaded_font_name:
         matplotlib.rcParams["font.family"] = loaded_font_name
     else:
-        # fallback (앱이 죽지 않는 게 우선)
         matplotlib.rcParams["font.family"] = "DejaVu Sans"
 
     matplotlib.rcParams["axes.unicode_minus"] = False
@@ -216,237 +199,172 @@ def configure_matplotlib_korean_font() -> str:
 
 
 # =========================================================
-# Stats helpers (Top N)
+# Units / Formatting helpers
 # =========================================================
-def format_krw_compact(n: float | int) -> str:
-    n = float(n or 0)
-    if n >= 1e8:
-        return f"{n/1e8:.1f}억"
-    if n >= 1e4:
-        return f"{n/1e4:.0f}만"
-    return f"{n:.0f}"
+def chewon_to_eok(x: float | int) -> float:
+    # 천원 -> 억원 (천원/100000 = 억원)
+    return float(x or 0) / 100000.0
 
-def build_top7_combo_chart_data_uri(
+
+def chewon_to_man(x: float | int) -> float:
+    # 천원 -> 만원 (천원/10 = 만원)
+    return float(x or 0) / 10.0
+
+
+def manwon_to_chewon(m: int) -> int:
+    # 만원 -> 천원
+    return int(m) * 10
+
+
+# =========================================================
+# Chart (Top10 combo: bar 1 + line 2)  [유병률 기반]
+# =========================================================
+def build_top10_combo_chart_data_uri(
     rows: list[dict],
     title: str,
     basis: str,
-    start_year: int | None = None,
-    end_year: int | None = None,
+    start_year: int,
+    end_year: int,
 ) -> str:
     """
-    Top7 콤보 차트 (막대 1 + 보조선 2)
+    Top10 콤보 차트 (막대 1 + 보조선 2) - 유병률 버전
 
-    입력 rows: fetch_top_rows() 결과 (집계값)
+    rows 필드(필수):
       - disease_code
       - disease_name_ko
-      - patient_cnt      (기간합, 명)
-      - total_cost       (기간합, 천원)
-      - cost_per_patient (기간평균, 천원)
+      - total_cost           (기간합, 천원)
+      - prevalence_per_100k  (기간집계, 10만명당)
+      - cost_per_patient     (기간평균, 천원)
 
-    표기/정책
-      - 총진료비, 환자수: "연평균"으로 변환해서 표시 (기간합 ÷ years)
-      - 1인당 진료비: 기간평균 그대로 표시
-      - 단위:
-          * 총진료비: 억원
-          * 1인당 진료비: 만원
-          * 환자수: 명
-      - 막대 = basis(선택 기준) 1개
-      - 보조선 = 나머지 2개 (항상 2개 유지, 중복이면 해당 선은 숨김)
-      - Y축: 질병명(코드)
-      - 보조축:
-          * 보조선1(총진료비): 위쪽(top)
-          * 보조선2(1인당): 아래쪽(bottom)  (중복 테두리/가로선 제거)
-      - 메인 막대 축: 라벨/눈금 숫자 숨김 (값 라벨로 충분)
-      - 범례: 보조선만 표시(2개 또는 1개)
-      - 색:
-          * 미래에셋 블루: #003A70
-          * 오렌지:        #F58220
+    표기 정책:
+      - 총진료비: 연평균(기간합 ÷ years) → 억원
+      - 유병률: 10만명당 그대로
+      - 1인당: 천원 → 만원
+      - 막대 = basis(선택 기준)
+      - 보조선 = 나머지 2개 (top/bottom)
+      - 메인 막대축 숫자 숨김(값 라벨로 표시)
+      - 보조축 숫자는 표시
+      - 상단 중복 라인 제거, 하단 축은 표에 거의 붙게
     """
     if not rows:
         return ""
 
-    # --- font (절대 안 죽게) ---
     try:
         configure_matplotlib_korean_font()
     except Exception:
         pass
 
-    import matplotlib.pyplot as plt
-    from matplotlib.ticker import FuncFormatter
-    from io import BytesIO
-    import base64
-
     MIRAE_BLUE = "#003A70"
     MIRAE_ORANGE = "#F58220"
 
-    # --- years for annualization ---
-    if start_year is None or end_year is None:
-        years = 1
-    else:
-        years = max(1, int(end_year) - int(start_year) + 1)
+    years = max(1, int(end_year) - int(start_year) + 1)
 
-    # --- unit conversions (원 데이터: total_cost/cpp = 천원) ---
-    def to_eok_from_chewon(x: float) -> float:
-        # 1억 원 = 100,000천원
-        return float(x or 0) / 100000.0
-
-    def to_man_from_chewon(x: float) -> float:
-        # 1만 원 = 10천원
-        return float(x or 0) / 10.0
-
-    # --- build series (연평균 적용) ---
     labels: list[str] = []
-    patient_avg: list[float] = []   # 연평균 환자수(명)
-    cost_avg_eok: list[float] = []  # 연평균 총진료비(억원)
-    cpp_man: list[float] = []       # 1인당(만원) (기간평균)
+    cost_avg_eok: list[float] = []
+    prev_100k: list[float] = []
+    cpp_man: list[float] = []
 
     for r in rows:
         code = (r.get("disease_code") or "").strip()
         name = (r.get("disease_name_ko") or "").strip() or code or "질병"
         labels.append(f"{name} ({code})" if code else name)
 
-        p_sum = float(r.get("patient_cnt") or 0)
-        c_sum_chewon = float(r.get("total_cost") or 0)
+        total_cost_chewon = float(r.get("total_cost") or 0)
+        prevalence = float(r.get("prevalence_per_100k") or 0)
         cpp_chewon = float(r.get("cost_per_patient") or 0)
 
-        patient_avg.append(p_sum / years)
-        cost_avg_eok.append(to_eok_from_chewon(c_sum_chewon / years))
-        cpp_man.append(to_man_from_chewon(cpp_chewon))
+        cost_avg_eok.append(chewon_to_eok(total_cost_chewon / years))
+        prev_100k.append(prevalence)
+        cpp_man.append(chewon_to_man(cpp_chewon))
 
-    # Top1이 위로 오게
+    # Top1이 위로 보이도록 reverse
     labels = labels[::-1]
-    patient_avg = patient_avg[::-1]
     cost_avg_eok = cost_avg_eok[::-1]
+    prev_100k = prev_100k[::-1]
     cpp_man = cpp_man[::-1]
     y = list(range(len(labels)))
 
-    # --- choose bar by basis ---
-    if basis == "patient_cnt":
-        bar_vals = patient_avg
-        main_name = "환자수(연평균)"
-        main_unit = "명"
-        # aux: cost + cpp
-        aux1 = ("연평균 총 진료비", cost_avg_eok, "억", MIRAE_ORANGE, "top")
-        aux2 = ("1인당 진료비", cpp_man, "만", MIRAE_BLUE, "bottom")
-    elif basis == "total_cost":
+    # basis 선택
+    if basis == "total_cost":
         bar_vals = cost_avg_eok
-        main_name = "총 진료비(연평균)"
         main_unit = "억"
-        # aux: patient + cpp
-        aux1 = ("환자수(연평균)", patient_avg, "명", MIRAE_ORANGE, "top")
-        aux2 = ("1인당 진료비", cpp_man, "만", MIRAE_BLUE, "bottom")
+        aux1 = ("유병률", prev_100k, " /10만", MIRAE_ORANGE, "top")
+        aux2 = ("1인당", cpp_man, "만", MIRAE_BLUE, "bottom")
+    elif basis == "prevalence_per_100k":
+        bar_vals = prev_100k
+        main_unit = "/10만"
+        aux1 = ("연평균 총 진료비", cost_avg_eok, "억", MIRAE_ORANGE, "top")
+        aux2 = ("1인당", cpp_man, "만", MIRAE_BLUE, "bottom")
     else:  # cost_per_patient
         bar_vals = cpp_man
-        main_name = "1인당 진료비(기간평균)"
         main_unit = "만"
-        # aux: patient + cost
-        aux1 = ("환자수(연평균)", patient_avg, "명", MIRAE_ORANGE, "top")
+        aux1 = ("유병률", prev_100k, " /10만", MIRAE_ORANGE, "top")
         aux2 = ("연평균 총 진료비", cost_avg_eok, "억", MIRAE_BLUE, "bottom")
 
-    # --- plot ---
     plt.close("all")
-    fig, ax = plt.subplots(figsize=(12.5, 5.2), dpi=200)
+    fig, ax = plt.subplots(figsize=(12.5, 5.8), dpi=200)
 
-    # bar
     ax.barh(y, bar_vals)
     ax.set_yticks(y)
     ax.set_yticklabels(labels)
 
-    # 메인축(막대축) 라벨/눈금 숨김
     ax.set_xlabel("")
     ax.tick_params(axis="x", bottom=False, labelbottom=False)
     ax.grid(axis="x", linestyle="--", alpha=0.25)
-
-    # ✅ 중복 가로선 제거(위쪽 테두리)
     ax.spines["top"].set_visible(False)
 
-    # --- helper formatter ---
-    def fmt_with_unit(unit: str):
-        if unit == "명":
-            return FuncFormatter(lambda v, p: f"{int(v):,}")
-        # 억/만은 소수 0자리(필요하면 1자리로 변경 가능)
-        return FuncFormatter(lambda v, p: f"{v:.0f}")
+    def fmt_axis(unit: str):
+        if unit.strip() == "억":
+            return FuncFormatter(lambda v, p: f"{v:,.0f}")
+        if unit.strip() == "만":
+            return FuncFormatter(lambda v, p: f"{v:,.0f}")
+        # /10만
+        return FuncFormatter(lambda v, p: f"{v:,.0f}")
 
-    # --- aux axes (top/bottom) ---
     ax_top = ax.twiny()
     ax_bottom = ax.twiny()
 
-    # positions: top은 살짝 위로, bottom은 "표에 붙게" 아주 살짝 아래로만
     ax_top.spines["top"].set_position(("axes", 1.02))
-
-    # ✅ 핵심: -0.10 → -0.02 (거의 붙이는 느낌)
-    ax_bottom.spines["bottom"].set_position(("axes", -0.0001))  # 더 붙임
-
+    ax_bottom.spines["bottom"].set_position(("axes", -0.0001))
     ax_bottom.xaxis.set_ticks_position("bottom")
     ax_bottom.xaxis.set_label_position("bottom")
 
-    # ✅ 보조축 스파인 정리 (쓸데없는 테두리 제거)
     for a in (ax_top, ax_bottom):
         a.spines["left"].set_visible(False)
         a.spines["right"].set_visible(False)
     ax_top.spines["bottom"].set_visible(False)
     ax_bottom.spines["top"].set_visible(False)
 
-    # ✅ tick/label pad도 줄이면 더 "붙어" 보임
     ax_top.tick_params(axis="x", top=True, labeltop=True, direction="out", pad=2)
     ax_bottom.tick_params(axis="x", bottom=True, labelbottom=True, direction="out", pad=2)
 
-    # unpack aux definitions
     aux_top = aux1 if aux1[4] == "top" else aux2
     aux_bot = aux2 if aux2[4] == "bottom" else aux1
 
     top_label, top_vals, top_unit, top_color, _ = aux_top
     bot_label, bot_vals, bot_unit, bot_color, _ = aux_bot
 
-    # axis limits (pad)
     ax_top.set_xlim(0, (max(top_vals) * 1.25) if max(top_vals) > 0 else 1)
     ax_bottom.set_xlim(0, (max(bot_vals) * 1.25) if max(bot_vals) > 0 else 1)
 
-    # axis labels + ticks (✅ 숫자 표시)
-    ax_top.set_xlabel(f"{top_label}({top_unit})")
-    ax_bottom.set_xlabel(f"{bot_label}({bot_unit})")
-    ax_top.xaxis.set_major_formatter(fmt_with_unit(top_unit))
-    ax_bottom.xaxis.set_major_formatter(fmt_with_unit(bot_unit))
-    ax_top.tick_params(axis="x", top=True, labeltop=True, direction="out", pad=2)
-    ax_bottom.tick_params(axis="x", bottom=True, labelbottom=True, direction="out", pad=2)
+    ax_top.set_xlabel(f"{top_label}({top_unit.strip()})")
+    ax_bottom.set_xlabel(f"{bot_label}({bot_unit.strip()})")
+    ax_top.xaxis.set_major_formatter(fmt_axis(top_unit))
+    ax_bottom.xaxis.set_major_formatter(fmt_axis(bot_unit))
 
-    # lines
-    h_top, = ax_top.plot(top_vals, y, marker="o", linewidth=2.4, color=top_color, label=f"{top_label}({top_unit})")
-    h_bot, = ax_bottom.plot(bot_vals, y, marker="o", linewidth=2.4, color=bot_color, label=f"{bot_label}({bot_unit})")
+    h_top, = ax_top.plot(top_vals, y, marker="o", linewidth=2.4, color=top_color, label=f"{top_label}({top_unit.strip()})")
+    h_bot, = ax_bottom.plot(bot_vals, y, marker="o", linewidth=2.4, color=bot_color, label=f"{bot_label}({bot_unit.strip()})")
 
-    # bar range for text layout
     ax.set_xlim(0, (max(bar_vals) * 1.12) if max(bar_vals) > 0 else 1)
 
-    # --- per-row annotation: "메인 1회만" + (보조 2개) ---
+    # 값 라벨: 메인 + (보조2개)
     for i in range(len(labels)):
-        if main_unit == "명":
-            main_txt = f"{int(bar_vals[i]):,}명"
-        else:
-            main_txt = f"{bar_vals[i]:.1f}{main_unit}"
+        main_txt = f"{bar_vals[i]:,.1f}{main_unit}"
+        top_txt = f"{top_vals[i]:,.1f}{top_unit.strip()}"
+        bot_txt = f"{bot_vals[i]:,.1f}{bot_unit.strip()}"
+        ax.text(bar_vals[i], i, f"  {main_txt} ({top_txt} · {bot_txt})", va="center", fontsize=9)
 
-        # 보조는 항상 2개 (top/bottom)
-        if top_unit == "명":
-            top_txt = f"{int(top_vals[i]):,}명"
-        else:
-            top_txt = f"{top_vals[i]:.1f}{top_unit}"
-
-        if bot_unit == "명":
-            bot_txt = f"{int(bot_vals[i]):,}명"
-        else:
-            bot_txt = f"{bot_vals[i]:.1f}{bot_unit}"
-
-        ax.text(
-            bar_vals[i],
-            i,
-            f"  {main_txt} ({top_txt} · {bot_txt})",
-            va="center",
-            fontsize=9,
-        )
-
-    # title (✅ 메인 문구는 빼고 기준만)
     fig.suptitle(title, fontsize=14, fontweight="bold")
-
-    # legend (보조 2개)
     ax.legend(handles=[h_top, h_bot], loc="lower right", frameon=True)
 
     fig.tight_layout(rect=[0, 0, 1, 0.95])
@@ -457,12 +375,24 @@ def build_top7_combo_chart_data_uri(
     png_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{png_b64}"
 
+
+# =========================================================
+# Sort options / Age mapping
+# =========================================================
 STAT_SORT_OPTIONS = {
     "총 진료비(연평균)": {"key": "total_cost"},
     "유병률(10만명당)": {"key": "prevalence_per_100k"},
     "1인당 진료비(기간평균)": {"key": "cost_per_patient"},
 }
 
+AGE_GROUP_MAP = {
+    "20대": "20_29",
+    "30대": "30_39",
+    "40대": "40_49",
+    "50대": "50_59",
+    "60대": "60_69",
+    "70대": "70_79",
+}
 
 AFTER_AGE_GROUPS = {
     "20대": ["30_39", "40_49", "50_59", "60_69", "70_79", "80_plus"],
@@ -474,13 +404,16 @@ AFTER_AGE_GROUPS = {
 }
 
 
+# =========================================================
+# D1 fetch (현재/이후): 유병률 집계 + 조건필터(유병률, 1인당) 공통 적용
+# =========================================================
 @st.cache_data(show_spinner=False, ttl=3600)
 def fetch_top_rows(
     start_year: int,
     end_year: int,
     age_group: str,
     sex: str,
-    sort_key: str = "total_cost",  # total_cost | prevalence_per_100k | cost_per_patient
+    sort_key: str = "total_cost",
     limit: int = 10,
     min_prev_100k: float | None = None,
     min_cpp_chewon: int | None = None,
@@ -496,7 +429,7 @@ def fetch_top_rows(
     }[sort_key]
 
     having_sql = "HAVING 1=1\n"
-    params = [int(start_year), int(end_year), age_group, sex]
+    params: list = [int(start_year), int(end_year), age_group, sex]
 
     if min_prev_100k is not None and float(min_prev_100k) > 0:
         having_sql += (
@@ -518,9 +451,9 @@ def fetch_top_rows(
         m.disease_code AS disease_code,
         COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
 
-        SUM(m.total_cost)  AS total_cost, -- 기간합(천원)
-        SUM(m.patient_cnt) AS patient_cnt, -- 내부 계산용(표시하지 않을 예정)
-        SUM(m.population)  AS population,  -- 내부 계산용
+        SUM(m.total_cost)  AS total_cost,
+        SUM(m.patient_cnt) AS patient_cnt,
+        SUM(m.population)  AS population,
 
         (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(SUM(m.population), 0)) * 100000.0 AS prevalence_per_100k,
         CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
@@ -565,9 +498,8 @@ def fetch_top_rows_after_age(
     }[sort_key]
 
     placeholders = ",".join(["?"] * len(after_age_groups))
-
     having_sql = "HAVING 1=1\n"
-    params = [int(start_year), int(end_year), sex, *after_age_groups]
+    params: list = [int(start_year), int(end_year), sex, *after_age_groups]
 
     if min_prev_100k is not None and float(min_prev_100k) > 0:
         having_sql += (
@@ -612,9 +544,10 @@ def fetch_top_rows_after_age(
 
 
 def pick_emerging_rows(now_rows: list[dict], after_rows: list[dict], limit: int = 5) -> list[dict]:
-    now_codes = { (r.get("disease_code") or "").strip() for r in (now_rows or []) }
+    now_codes = {(r.get("disease_code") or "").strip() for r in (now_rows or [])}
     emerging = [r for r in (after_rows or []) if ((r.get("disease_code") or "").strip() not in now_codes)]
     return emerging[:limit]
+
 
 # =========================================================
 # Utilities (rendering)
@@ -677,14 +610,10 @@ def build_embedded_font_face_css() -> str:
 def build_css_for_both(css_path: Path) -> str:
     base_css = css_path.read_text(encoding="utf-8")
     font_css = build_embedded_font_face_css()
-
     bullet_fix_css = """
-/* bullets: 점(•) 직접 렌더 */
 .bullets{ list-style:none !important; margin:0 !important; padding-left:0 !important; }
 .bullets li{ position:relative; padding-left:16px; margin:5px 0; }
 .bullets li::before{ content:"•"; position:absolute; left:0; top:0; }
-
-/* questions: counter로 번호 직접 렌더 */
 .questions{ list-style:none !important; margin:0 !important; padding-left:0 !important; counter-reset:q; }
 .questions li{ position:relative; padding-left:18px; margin:6px 0; }
 .questions li::before{
@@ -709,8 +638,6 @@ def inject_inline_css(html: str, css_text: str, css_path_in_template: str) -> st
     needle = f'<link rel="stylesheet" href="{css_path_in_template}" />'
     if needle in html:
         return html.replace(needle, f"<style>\n{css_text}\n</style>")
-
-    # fallback
     return re.sub(
         r'<link\s+rel=["\']stylesheet["\']\s+href=["\'][^"\']+["\']\s*/?>',
         f"<style>\n{css_text}\n</style>",
@@ -727,34 +654,6 @@ def build_final_html_for_both(context: Dict[str, Any]) -> str:
     return html
 
 
-def build_top_table_df(rows: list[dict]) -> "pd.DataFrame":
-    if not rows:
-        return pd.DataFrame(columns=["disease_code", "질병", "총진료비(억원)", "환자수", "1인당(만원)"])
-
-    data = []
-    for r in rows:
-        code = (r.get("disease_code") or "").strip()
-        name = (r.get("disease_name_ko") or "").strip() or code
-
-        total_cost_억원 = float(r.get("total_cost") or 0) / 100000.0
-        cpp_만원 = float(r.get("cost_per_patient") or 0) / 10.0
-
-        data.append({
-            "disease_code": code,
-            "질병": name,
-            "총진료비(억원)": round(total_cost_억원, 1),
-            "환자수": int(r.get("patient_cnt") or 0),
-            "1인당(만원)": round(cpp_만원, 1),
-        })
-
-    return pd.DataFrame(data)
-
-def fmt_int(n: int | float) -> str:
-    return f"{int(n):,}"
-
-def fmt_float1(n: float) -> str:
-    return f"{n:,.1f}"
-
 # =========================================================
 # PDF generation (Chromium via Playwright)
 # =========================================================
@@ -766,11 +665,9 @@ def chromium_pdf_bytes(html: str) -> bytes:
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 1200, "height": 800})
-
         page.set_content(html, wait_until="load")
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(150)  # 폰트/레이아웃 settle
-
+        page.wait_for_timeout(150)
         pdf_bytes = page.pdf(
             format="A4",
             print_background=True,
@@ -796,10 +693,6 @@ except Exception as e:
     st.error(f"접속 검증 실패: {e}")
     st.stop()
 
-st.write("REG", (FONT_DIR / "NotoSansKR-Regular.ttf").exists(), (FONT_DIR / "NotoSansKR-Regular.ttf").stat().st_size if (FONT_DIR / "NotoSansKR-Regular.ttf").exists() else None)
-st.write("BOLD", (FONT_DIR / "NotoSansKR-Bold.ttf").exists(), (FONT_DIR / "NotoSansKR-Bold.ttf").stat().st_size if (FONT_DIR / "NotoSansKR-Bold.ttf").exists() else None)
-
-
 segments_db = load_json(SEGMENTS_PATH)
 stats_db = load_json(STATS_PATH)
 
@@ -812,22 +705,17 @@ st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
 st.divider()
 
+# -------------------------
+# 고객 기본 정보 (한 줄 정렬)
+# -------------------------
 st.subheader("고객 기본 정보")
-
-col1, col2, col3 = st.columns([2, 1, 1])
-
-with col1:
+c1, c2, c3 = st.columns([2, 1, 1])
+with c1:
     customer_name = st.text_input("고객 성명", value="")
-
-with col2:
+with c2:
     gender = st.selectbox("성별", ["남성", "여성"])
-
-with col3:
-    age_band = st.selectbox(
-    "연령대",
-    ["20대", "30대", "40대", "50대", "60대", "70대"]
-)
-
+with c3:
+    age_band = st.selectbox("연령대", ["20대", "30대", "40대", "50대", "60대", "70대"])
 
 key = segment_key(age_band, gender)
 segment = segments_db["segments"].get(key)
@@ -835,156 +723,67 @@ if not segment:
     st.error(f"콘텐츠 세트가 없습니다: {key}")
     st.stop()
 
-# =========================================================
-# 통계 표시 옵션 (기간 + Top10 기준 + 조건필터)
-# =========================================================
+# -------------------------
+# 통계 표시 옵션
+# -------------------------
 st.subheader("통계 표시 옵션")
-
 min_year, max_year = fetch_year_range()
-
-# ✅ 기간(시작/종료)을 라디오 위로
-default_end = max_year
-default_start = max_year
 
 colA, colB = st.columns(2)
 with colA:
-    start_year = st.number_input(
-        "시작년도",
-        min_value=int(min_year),
-        max_value=int(max_year),
-        value=int(default_start),
-        step=1,
-    )
+    start_year = st.number_input("시작년도", min_value=int(min_year), max_value=int(max_year), value=int(max_year), step=1)
 with colB:
-    end_year = st.number_input(
-        "종료년도",
-        min_value=int(min_year),
-        max_value=int(max_year),
-        value=int(default_end),
-        step=1,
-    )
+    end_year = st.number_input("종료년도", min_value=int(min_year), max_value=int(max_year), value=int(max_year), step=1)
 
 if start_year > end_year:
     start_year, end_year = end_year, start_year
     st.info(f"시작/종료년도를 자동 보정했습니다: {start_year} ~ {end_year}")
 
-STAT_SORT_OPTIONS = {
-    "총 진료비(연평균)": {"key": "total_cost"},
-    "환자수(연평균)": {"key": "patient_cnt"},
-    "1인당 진료비(기간평균)": {"key": "cost_per_patient"},
-}
-
-sort_label = st.radio(
-    "Top10 기준",
-    options=list(STAT_SORT_OPTIONS.keys()),
-    index=0,
-    horizontal=True,
-)
+sort_label = st.radio("Top10 기준", options=list(STAT_SORT_OPTIONS.keys()), index=0, horizontal=True)
 sort_key = STAT_SORT_OPTIONS[sort_label]["key"]
 
-# ✅ 기준에 따라 추가 옵션(슬라이더) 노출
-# - 기본값: 환자수 100명, 1인당 100만원
-min_prev_100k: float | None = None
-min_cpp_chewon: int | None = None
+# ✅ 조건필터: 유병률 + 1인당 진료비 (항상 노출, 둘 다 공통 적용)
+st.caption("조건 필터(공통): 현재/미래/신규 부각 통계 모두 동일 기준으로 필터링됩니다.")
 
-# 슬라이더 편의: 1인당 진료비(만원)로 입력 받고 -> 천원으로 변환
-def manwon_to_chewon(m: int) -> int:
-    # 만원 -> 원: *10,000, 천원: /1,000 => 만원*10
-    return int(m) * 10
-
-st.caption("조건 필터(선택): 기준이 총진료비/유병율(10만명당)/1인당 진료비 중 무엇이냐에 따라 입력 옵션이 달라집니다.")
-
-if sort_key == "total_cost":
-    c1, c2 = st.columns(2)
-    with c1:
-        min_prev_100k = st.slider("최소 유병률(10만명당)", 0.0, 2000.0, 50.0, 5.0)
-    with c2:
-        min_cpp_manwon = st.slider("최소 1인당 진료비(만원)", 0, 5000, 100, 10)
-        min_cpp_chewon = manwon_to_chewon(min_cpp_manwon)
-
-elif sort_key == "prevalence_per_100k":
-    min_cpp_manwon = st.slider("최소 1인당 진료비(만원)", 0, 5000, 100, 10)
-
-else:  # cost_per_patient
+fc1, fc2 = st.columns(2)
+with fc1:
     min_prev_100k = st.slider("최소 유병률(10만명당)", 0.0, 2000.0, 50.0, 5.0)
+with fc2:
+    min_cpp_manwon = st.slider("최소 1인당 진료비(만원)", 0, 5000, 100, 10)
+    min_cpp_chewon = manwon_to_chewon(min_cpp_manwon)
 
-# =========================================================
-# D1 기반 통계 미리보기 (현재 연령대 + 이후 연령대 합산)
-# =========================================================
+# -------------------------
+# D1 기반 통계 (현재 + 이후 + 신규부각)
+# -------------------------
 years = max(1, int(end_year) - int(start_year) + 1)
 
-AGE_GROUP_MAP = {
-    "20대": "20_29",
-    "30대": "30_39",
-    "40대": "40_49",
-    "50대": "50_59",
-    "60대": "60_69",
-    "70대": "70_79",
-}
 age_group = AGE_GROUP_MAP.get(age_band, "50_59")
 sex = "M" if gender == "남성" else "F"
 sex_display = "남성" if sex == "M" else "여성"
 
-# ✅ 표 숫자 포맷: 콤마 + 소수 1자리
-def chewon_to_eok(x: float | int) -> float:
-    return float(x or 0) / 100000.0  # 천원 -> 억원
-
-def chewon_to_man(x: float | int) -> float:
-    return float(x or 0) / 10.0      # 천원 -> 만원
-
-def annualize_total_cost_eok(total_cost_chewon: float | int) -> float:
-    # 기간합(천원) -> 연평균(천원) -> 억원
-    return chewon_to_eok((float(total_cost_chewon or 0) / years))
-
-def annualize_patient_cnt(patient_cnt_sum: float | int) -> float:
-    # 기간합(명) -> 연평균(명)
-    return float(patient_cnt_sum or 0) / years
-
 st.markdown("---")
-
 st.markdown("#### 고객 연령대 통계 (현재)")
 
 try:
     top_rows = fetch_top_rows(
-        start_year,
-        end_year,
-        age_group,
-        sex,
-        sort_key=sort_key,
-        limit=10,
+        int(start_year), int(end_year),
+        age_group, sex,
+        sort_key=sort_key, limit=10,
         min_prev_100k=min_prev_100k,
         min_cpp_chewon=min_cpp_chewon,
-    )
-except TypeError:
-    top_rows = fetch_top_rows(
-        start_year,
-        end_year,
-        age_group,
-        sex,
-        sort_key=sort_key,
-        limit=10,
     )
 except Exception as e:
     st.error(f"D1 통계 조회 실패: {e}")
     top_rows = []
 
-chart_title = (
-    f"Top10 질병 통계 "
-    f"({start_year}~{end_year} · {age_band} · {sex_display} · 기준: {sort_label})"
-)
-
-# ✅ 차트 함수에 start_year/end_year 전달 (연평균 계산 일관성)
-chart_data_uri = build_top7_combo_chart_data_uri(
-    top_rows,
-    title=chart_title,
-    basis=sort_key,
-    start_year=int(start_year),
-    end_year=int(end_year),
+chart_title = f"Top10 질병 통계 ({start_year}~{end_year} · {age_band} · {sex_display} · 기준: {sort_label})"
+chart_data_uri = build_top10_combo_chart_data_uri(
+    top_rows, title=chart_title, basis=sort_key,
+    start_year=int(start_year), end_year=int(end_year),
 )
 
 if chart_data_uri:
-    b64 = chart_data_uri.split(",", 1)[1]
-    st.image(base64.b64decode(b64))
+    st.image(base64.b64decode(chart_data_uri.split(",", 1)[1]))
 else:
     st.warning("차트를 만들 데이터가 없습니다. 조건을 바꿔보세요.")
 
@@ -994,7 +793,7 @@ with st.expander("통계 상세 (Top10 테이블) - 현재 연령대"):
             {
                 "질병코드": r.get("disease_code"),
                 "질병명": r.get("disease_name_ko") or r.get("disease_code"),
-                "총진료비(연평균, 억원)": f"{chewon_to_eok(r.get('total_cost')/years):,.1f}",
+                "총진료비(연평균, 억원)": f"{chewon_to_eok((float(r.get('total_cost') or 0) / years)):,.1f}",
                 "유병률(10만명당)": f"{float(r.get('prevalence_per_100k') or 0):,.1f}",
                 "1인당 진료비(만원)": f"{chewon_to_man(r.get('cost_per_patient')):,.1f}",
             }
@@ -1004,12 +803,10 @@ with st.expander("통계 상세 (Top10 테이블) - 현재 연령대"):
         hide_index=True,
     )
 
-
-# =========================================================
-# ---- 이후 연령대 ----
-# =========================================================
+# -------------------------
+# 이후 연령대(미래 위험)
+# -------------------------
 st.markdown("#### 이후 연령대 통계 (미래 위험)")
-
 after_groups = AFTER_AGE_GROUPS.get(age_band, [])
 
 if not after_groups:
@@ -1018,23 +815,11 @@ if not after_groups:
 else:
     try:
         after_rows = fetch_top_rows_after_age(
-            start_year=int(start_year),
-            end_year=int(end_year),
-            after_age_groups=after_groups,
-            sex=sex,
-            sort_key=sort_key,
-            limit=10,
+            int(start_year), int(end_year),
+            after_groups, sex,
+            sort_key=sort_key, limit=10,
             min_prev_100k=min_prev_100k,
             min_cpp_chewon=min_cpp_chewon,
-        )
-    except TypeError:
-        after_rows = fetch_top_rows_after_age(
-            start_year,
-            end_year,
-            after_groups,
-            sex,
-            sort_key,
-            limit=10,
         )
     except Exception as e:
         st.error(f"D1 이후 연령대 통계 조회 실패: {e}")
@@ -1042,12 +827,9 @@ else:
 
 if after_groups and after_rows:
     after_title = f"이후 연령대 합산 통계 ({age_band} 이후 · {sex_display} · 기준: {sort_label})"
-    after_chart_uri = build_top7_combo_chart_data_uri(
-        after_rows,
-        title=after_title,
-        basis=sort_key,
-        start_year=int(start_year),
-        end_year=int(end_year),
+    after_chart_uri = build_top10_combo_chart_data_uri(
+        after_rows, title=after_title, basis=sort_key,
+        start_year=int(start_year), end_year=int(end_year),
     )
     st.image(base64.b64decode(after_chart_uri.split(",", 1)[1]))
 
@@ -1057,11 +839,11 @@ if after_groups and after_rows:
                 {
                     "질병코드": r.get("disease_code"),
                     "질병명": r.get("disease_name_ko") or r.get("disease_code"),
-                    "총진료비(연평균, 억원)": f"{chewon_to_eok(r.get('total_cost')/years):,.1f}",
+                    "총진료비(연평균, 억원)": f"{chewon_to_eok((float(r.get('total_cost') or 0) / years)):,.1f}",
                     "유병률(10만명당)": f"{float(r.get('prevalence_per_100k') or 0):,.1f}",
                     "1인당 진료비(만원)": f"{chewon_to_man(r.get('cost_per_patient')):,.1f}",
                 }
-                for r in (top_rows or [])
+                for r in (after_rows or [])
             ],
             use_container_width=True,
             hide_index=True,
@@ -1070,8 +852,9 @@ else:
     if after_groups:
         st.warning("이후 연령대 합산 조건에서 Top10 데이터가 없습니다. 조건을 완화해 보세요.")
 
-
-# ---- 신규 부각 ----
+# -------------------------
+# 신규 부각 질병 (현재 Top10에 없음)
+# -------------------------
 emerging_rows = pick_emerging_rows(top_rows, after_rows, limit=5)
 
 if emerging_rows:
@@ -1082,11 +865,11 @@ if emerging_rows:
                 {
                     "질병코드": r.get("disease_code"),
                     "질병명": r.get("disease_name_ko") or r.get("disease_code"),
-                    "총진료비(연평균, 억원)": f"{chewon_to_eok(r.get('total_cost')/years):,.1f}",
+                    "총진료비(연평균, 억원)": f"{chewon_to_eok((float(r.get('total_cost') or 0) / years)):,.1f}",
                     "유병률(10만명당)": f"{float(r.get('prevalence_per_100k') or 0):,.1f}",
                     "1인당 진료비(만원)": f"{chewon_to_man(r.get('cost_per_patient')):,.1f}",
                 }
-                for r in (top_rows or [])
+                for r in (emerging_rows or [])
             ],
             use_container_width=True,
             hide_index=True,
@@ -1096,6 +879,9 @@ else:
 
 st.markdown("---")
 
+# =========================================================
+# 문구 커스터마이징 + HTML/PDF 미리보기/출력
+# =========================================================
 st.subheader("문구 조정(표준 문구를 커스터마이징 가능합니다.)")
 summary_lines = segment["summary_lines"][:]
 gap_questions = segment["gap_questions"][:]
