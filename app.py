@@ -760,8 +760,6 @@ chart_data_uri = build_top7_combo_chart_data_uri(
     top_rows,
     title=chart_title,
     basis=sort_key,
-    start_year=int(start_year),
-    end_year=int(end_year),
 )
 
 st.markdown("#### 통계 미리보기 (차트)")
