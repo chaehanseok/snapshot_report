@@ -944,6 +944,7 @@ def annualize_patient_cnt(patient_cnt_sum: float | int) -> float:
     # 기간합(명) -> 연평균(명)
     return float(patient_cnt_sum or 0) / years
 
+st.markdown("---")
 
 st.markdown("#### 고객 연령대 통계 (현재)")
 
