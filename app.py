@@ -627,37 +627,74 @@ AFTER_AGE_GROUPS = {
 def fetch_top_rows_after_age(
     start_year: int,
     end_year: int,
-    age_groups: list[str],
+    after_age_groups: list[str],
     sex: str,
-    sort_key: str,
+    sort_key: str = "total_cost",
     limit: int = 10,
+    min_patient_cnt: int | None = None,
+    min_cpp_chewon: int | None = None,
 ) -> list[dict]:
+    """
+    이후 연령대(여러 age_group) 합산 통계 TopN
+    - min_patient_cnt, min_cpp_chewon 를 HAVING으로 적용
+    - 캐시 키에 슬라이더 값이 포함되도록 함수 시그니처에 넣음
+    """
+    if not after_age_groups:
+        return []
 
-    placeholders = ",".join(["?"] * len(age_groups))
+    if sort_key not in ("total_cost", "patient_cnt", "cost_per_patient"):
+        sort_key = "total_cost"
+
+    order_by = {
+        "total_cost": "total_cost DESC",
+        "patient_cnt": "patient_cnt DESC",
+        "cost_per_patient": "cost_per_patient DESC",
+    }[sort_key]
+
+    placeholders = ",".join(["?"] * len(after_age_groups))
+
+    # ---- HAVING 동적 구성 (여기서 네가 말한 코드 조각이 들어갈 자리) ----
+    having_sql = "HAVING 1=1\n"
+    params = [int(start_year), int(end_year), sex, *after_age_groups]
+
+    if min_patient_cnt is not None and int(min_patient_cnt) > 0:
+        having_sql += "  AND SUM(m.patient_cnt) >= ?\n"
+        params.append(int(min_patient_cnt))
+
+    if min_cpp_chewon is not None and int(min_cpp_chewon) > 0:
+        having_sql += "  AND (CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
+        params.append(int(min_cpp_chewon))
+
+    params.append(int(limit))
 
     sql = f"""
     WITH agg AS (
       SELECT
-        m.disease_code,
+        m.disease_code AS disease_code,
         COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
-        SUM(m.patient_cnt) AS patient_cnt,
-        SUM(m.total_cost) AS total_cost,
-        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
+        -- 기간합을 만든 뒤, 연평균으로 변환(연수로 나눔)
+        CAST(SUM(m.patient_cnt) AS REAL) / NULLIF((? - ? + 1), 0) AS patient_cnt,
+        CAST(SUM(m.total_cost)  AS REAL) / NULLIF((? - ? + 1), 0) AS total_cost,
+        CAST(SUM(m.total_cost)  AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
       FROM disease_year_age_sex_metrics m
-      LEFT JOIN disease d ON m.disease_code = d.disease_code
+      LEFT JOIN disease d
+        ON m.disease_code = d.disease_code
       WHERE m.year BETWEEN ? AND ?
-        AND m.age_group IN ({placeholders})
         AND m.sex = ?
-      GROUP BY m.disease_code, disease_name_ko
+        AND m.age_group IN ({placeholders})
+      GROUP BY m.disease_code, COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code)
+      {having_sql}
     )
     SELECT * FROM agg
-    ORDER BY {sort_key} DESC
+    ORDER BY {order_by}
     LIMIT ?;
     """
 
-    params = [start_year, end_year, *age_groups, sex, limit]
-    return d1_query(sql, params)
+    # 주의: 연평균 계산용 (end-start+1) 파라미터 4개를 앞에 추가
+    years_params = [int(end_year), int(start_year), int(end_year), int(start_year)]
+    final_params = years_params + params
 
+    return d1_query(sql, final_params)
 
 # =========================================================
 # Utilities (rendering)
@@ -1055,11 +1092,11 @@ if not after_groups:
 else:
     try:
         after_rows = fetch_top_rows_after_age(
-            start_year,
-            end_year,
-            after_groups,
-            sex,
-            sort_key,
+            start_year=int(start_year),
+            end_year=int(end_year),
+            after_age_groups=after_groups,
+            sex=sex,
+            sort_key=sort_key,
             limit=10,
             min_patient_cnt=min_patient_cnt,
             min_cpp_chewon=min_cpp_chewon,
