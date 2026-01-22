@@ -214,6 +214,11 @@ html, body{
   margin-bottom: 6px;
 }
 
+/* 신규 부각 질병 – 수치 컬럼 가운데 정렬 */
+.section.emerging.compact table th:not(:first-child),
+.section.emerging.compact table td:not(:first-child) {
+  text-align: center;
+}
 
 /* =========================
    Bullets / Questions (안정화 버전)
