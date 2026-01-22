@@ -6,6 +6,7 @@ import os
 import sys
 import subprocess
 import requests
+from io import BytesIO
 
 import streamlit as st
 import streamlit.components.v1 as components
