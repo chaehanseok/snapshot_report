@@ -858,6 +858,7 @@ after_groups = AFTER_AGE_GROUPS.get(age_band, [])
 if not after_groups:
     st.info("선택한 연령대 이후의 통계가 존재하지 않습니다.")
     after_rows = []
+    after_chart_uri = None
 else:
     try:
         after_rows = fetch_top_rows_after_age(
@@ -953,6 +954,9 @@ structure_rows = [
 
 logo_data_uri = file_to_data_uri(LOGO_PATH, "image/png")
 
+st.write("DEBUG context after key:", context.get("after_chart_data_uri"))
+
+
 context = {
     "css_path": str(CSS_PATH),
     "logo_data_uri": logo_data_uri,
@@ -1020,10 +1024,21 @@ context = {
     ),
 }
 
+assert after_chart_uri, "after_chart_uri is empty"
+
+context["after_chart_data_uri"] = after_chart_uri
+context["after_table"] = render_table_html(after_rows)
+context["emerging_table"] = render_table_html(emerging_rows)
+
+
 final_html = build_final_html_for_both(context)
 
 st.subheader("미리보기")
 components.html(final_html, height=900, scrolling=True)
+
+st.write("DEBUG after_chart_uri:", after_chart_uri)
+st.write("DEBUG after_chart_uri type:", type(after_chart_uri))
+st.write("DEBUG after_chart_uri truthy:", bool(after_chart_uri))
 
 st.divider()
 st.subheader("확정 및 PDF 출력")
