@@ -373,3 +373,19 @@ html, body{
   .cards{ grid-template-columns:1fr; }
   .grid2{ grid-template-columns:1fr; }
 }
+
+/* =========================
+   Chart
+   ========================= */
+.chart-box{
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:10px;
+  background:#fff;
+}
+
+.chart-img{
+  width:100%;
+  height:auto;
+  display:block;
+}

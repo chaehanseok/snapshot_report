@@ -10,7 +10,8 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
@@ -170,6 +171,73 @@ def format_krw_compact(n: float | int) -> str:
         return f"{n/1e4:.0f}만"
     return f"{n:.0f}"
 
+def build_top7_combo_chart_data_uri(rows: list[dict], title: str) -> str | None:
+    """
+    rows: [{"disease_name_ko", "total_cost", "cost_per_patient", "patient_cnt"}...]
+    -> PNG bytes -> data:image/png;base64,...
+    """
+    if not rows:
+        return None
+
+    names = [str(r.get("disease_name_ko") or r.get("disease_code") or "").strip() for r in rows]
+    total_cost = [float(r.get("total_cost") or 0) for r in rows]
+    cpp = [float(r.get("cost_per_patient") or 0) for r in rows]
+    patient = [int(r.get("patient_cnt") or 0) for r in rows]
+
+    # 가로막대는 위->아래 읽기 자연스럽게 역순(큰 값이 위로)
+    names = names[::-1]
+    total_cost = total_cost[::-1]
+    cpp = cpp[::-1]
+    patient = patient[::-1]
+
+    # figsize는 A4 섹션에 잘 맞도록
+    fig = plt.figure(figsize=(10.6, 4.2), dpi=180)
+    ax = fig.add_subplot(111)
+    ax2 = ax.twiny()  # 가로막대축과 다른 축 공유(라인용)
+
+    y = list(range(len(names)))
+
+    # Bar: total_cost
+    ax.barh(y, total_cost, height=0.62, alpha=0.95)
+
+    # Line: cost_per_patient (같은 y좌표에 찍기)
+    ax2.plot(cpp, y, marker="o", linewidth=2)
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(names, fontsize=9)
+
+    # 축 포맷터(원 단위)
+    def krw_fmt(x, _):
+        x = float(x or 0)
+        if x >= 1e8:
+            return f"{x/1e8:.1f}억"
+        if x >= 1e4:
+            return f"{x/1e4:.0f}만"
+        return f"{x:.0f}"
+
+    ax.xaxis.set_major_formatter(FuncFormatter(krw_fmt))
+    ax2.xaxis.set_major_formatter(FuncFormatter(krw_fmt))
+
+    ax.set_xlabel("총 진료비(기간합)")
+    ax2.set_xlabel("1인당 진료비")
+
+    # 환자수(참고) 텍스트를 막대 끝에 찍기
+    for yi, v, p in zip(y, total_cost, patient):
+        ax.text(v, yi, f"  {p:,}명", va="center", fontsize=8)
+
+    ax.grid(True, axis="x", linestyle="--", alpha=0.35)
+    ax.set_title(title, fontsize=12, fontweight="bold", pad=10)
+
+    # 여백 최적화
+    fig.tight_layout()
+
+    # PNG로 저장 -> base64
+    buf = BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
+    plt.close(fig)
+    data = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return f"data:image/png;base64,{data}"
+
 
 STAT_SORT_OPTIONS = {
     "총 진료비(연간)": {"key": "total_cost", "label": "연간 진료비"},
@@ -243,7 +311,8 @@ def fetch_top_cards(
                 "value": f"{lead} · 진료비 {format_krw_compact(total_cost)} · 환자 {patient_cnt:,}명 · 1인당 {format_krw_compact(cpp)}",
             }
         )
-    return cards
+    # ✅ rows를 그대로 반환 (차트/표/카드 모두 여기서 파생)
+    return rows
 
 
 # =========================================================
@@ -482,7 +551,7 @@ age_group = AGE_GROUP_MAP.get(age_band, "50_59")
 sex = "M" if gender == "남성" else "F"
 
 try:
-    cards = fetch_top_cards(
+    top_rows = fetch_top_cards(
         start_year=int(start_year),
         end_year=int(end_year),
         age_group=age_group,
@@ -492,16 +561,29 @@ try:
     )
 except Exception as e:
     st.error(f"D1 통계 조회 실패: {e}")
-    cards = []
+    top_rows = []
 
-st.caption(f"통계 범위: {start_year}~{end_year} · 연령: {age_band}({age_group}) · 성별: {sex} · 기준: {sort_label}")
+chart_title = f"Top7 질병 통계 ({start_year}~{end_year} · {age_band} · {sex} · 기준: {sort_label})"
+chart_data_uri = build_top7_combo_chart_data_uri(top_rows, chart_title)
 
-# 통계 “먼저” 보여주기 (표 형태)
-if cards:
-    st.markdown("#### 통계 미리보기 (Top7)")
-    st.table([{"질병": c["title"], "요약": c["value"]} for c in cards])
+st.markdown("#### 통계 미리보기 (차트)")
+if chart_data_uri:
+    # Streamlit에서는 data uri 바로 st.image 가능
+    st.image(chart_data_uri)
 else:
-    st.warning("통계 데이터가 없습니다. (조건을 바꿔보세요)")
+    st.warning("차트를 만들 데이터가 없습니다. 조건을 바꿔보세요.")
+
+# (선택) 차트 아래 표도 같이 두면 문구 수정이 더 쉬움
+with st.expander("통계 상세(Top7 테이블)"):
+    st.table([
+        {
+            "질병": r.get("disease_name_ko") or r.get("disease_code"),
+            "총진료비": int(r.get("total_cost") or 0),
+            "환자수": int(r.get("patient_cnt") or 0),
+            "1인당": float(r.get("cost_per_patient") or 0),
+        }
+        for r in top_rows
+    ])
 
 
 st.subheader("문구 조정(선택/제한)")
@@ -551,8 +633,8 @@ context = {
     "stats": {
         "base_year": f"{start_year}~{end_year}",
         "source": stats_db.get("source", "공식 보건의료 통계(요약)"),
-        "cards": cards,
         "top7_basis": sort_label,
+        "chart_data_uri": chart_data_uri,
     },
     "structure_rows": structure_rows,
     "footer": stats_db.get(

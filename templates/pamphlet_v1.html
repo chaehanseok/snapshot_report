@@ -50,19 +50,24 @@
 
       <section class="section">
         <h2 class="section-title">현황 통계 예시</h2>
-        <div class="cards">
-          {% for card in stats.cards %}
-            <div class="card">
-              <div class="card__title">{{ card.title }}</div>
-              <div class="card__value">{{ card.value }}</div>
-            </div>
-          {% endfor %}
-        </div>
-        <div class="note">
-          * 위 내용은 동일 연령·성별 집단의 통계 기반 요약이며, 개인별 상황에 따라 달라질 수 있습니다.
-        </div>
-      </section>
 
+        {% if stats.chart_data_uri %}
+          <div class="chart-box">
+            <img class="chart-img" src="{{ stats.chart_data_uri }}" alt="Top7 통계 차트" />
+            <div class="note">
+              * 기준: {{ stats.base_year }} · {{ stats.source }} · Top7 기준: {{ stats.top7_basis }}
+            </div>
+          </div>
+        {% else %}
+          <div class="note">
+            * 통계 차트를 생성할 데이터가 없습니다.
+          </div>
+        {% endif %}
+          <div class="note">
+            * 위 내용은 동일 연령·성별 집단의 통계 기반 요약이며, 개인별 상황에 따라 달라질 수 있습니다.
+          </div>
+      </section>
+      
       <section class="section">
         <div class="grid2">
           <div>
