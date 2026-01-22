@@ -133,7 +133,7 @@ def d1_query(sql: str, params: list) -> list[dict]:
     """
     account_id = st.secrets["CF_ACCOUNT_ID"]
     api_token = st.secrets["CF_API_TOKEN"]
-    db_id = st.secrets["CF_D1_DB_ID"]
+    db_id = st.secrets["D1_DATABASE_ID"]
 
     url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{db_id}/query"
     headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
@@ -345,9 +345,9 @@ def chromium_pdf_bytes(html: str) -> bytes:
 # =========================================================
 st.set_page_config(page_title="보장 점검 유인 팜플렛", layout="centered")
 
-# 디버그 표시(원하면 나중에 지워도 됨)
-st.caption(f"PLAYWRIGHT_BROWSERS_PATH={os.environ.get('PLAYWRIGHT_BROWSERS_PATH')}")
-st.caption(f"exists? {Path(os.environ['PLAYWRIGHT_BROWSERS_PATH']).exists()}")
+# # 디버그 표시(원하면 나중에 지워도 됨)
+# st.caption(f"PLAYWRIGHT_BROWSERS_PATH={os.environ.get('PLAYWRIGHT_BROWSERS_PATH')}")
+# st.caption(f"exists? {Path(os.environ['PLAYWRIGHT_BROWSERS_PATH']).exists()}")
 
 token = st.query_params.get("token")
 if not token:
