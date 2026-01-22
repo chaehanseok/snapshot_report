@@ -768,7 +768,7 @@ try:
     top_rows = fetch_top_rows(
         int(start_year), int(end_year),
         age_group, sex,
-        sort_key=sort_key, limit=10,
+        sort_key=sort_key, limit=15,
         min_prev_100k=min_prev_100k,
         min_cpp_chewon=min_cpp_chewon,
     )
@@ -817,7 +817,7 @@ else:
         after_rows = fetch_top_rows_after_age(
             int(start_year), int(end_year),
             after_groups, sex,
-            sort_key=sort_key, limit=10,
+            sort_key=sort_key, limit=15,
             min_prev_100k=min_prev_100k,
             min_cpp_chewon=min_cpp_chewon,
         )
