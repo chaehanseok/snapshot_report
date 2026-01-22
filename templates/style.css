@@ -516,6 +516,16 @@ html, body{
   object-fit: contain;
 }
 
+/* 1페이지 메인 차트는 크게 */
+.page:nth-of-type(1) .stats-chart {
+  max-height: 520px;
+}
+
+/* 2페이지 차트는 컴팩트 유지 */
+.page:nth-of-type(2) .stats-chart {
+  max-height: 340px;
+}
+
 /* =========================
    Summary (Page 1 bottom)
    ========================= */

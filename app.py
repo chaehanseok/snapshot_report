@@ -306,7 +306,7 @@ def build_top10_combo_chart_data_uri(
 
     ax.barh(y, bar_vals)
     ax.set_yticks(y)
-    ax.set_yticklabels(labels)
+    ax.set_yticklabels(labels, fontsize=11.5)
 
     ax.set_xlabel("")
     ax.tick_params(axis="x", bottom=False, labelbottom=False)
@@ -352,6 +352,9 @@ def build_top10_combo_chart_data_uri(
     ax_top.xaxis.set_major_formatter(fmt_axis(top_unit))
     ax_bottom.xaxis.set_major_formatter(fmt_axis(bot_unit))
 
+    ax_top.xaxis.label.set_size(11)
+    ax_bottom.xaxis.label.set_size(11)
+
     h_top, = ax_top.plot(top_vals, y, marker="o", linewidth=2.4, color=top_color, label=f"{top_label}({top_unit.strip()})")
     h_bot, = ax_bottom.plot(bot_vals, y, marker="o", linewidth=2.4, color=bot_color, label=f"{bot_label}({bot_unit.strip()})")
 
@@ -362,10 +365,10 @@ def build_top10_combo_chart_data_uri(
         main_txt = f"{bar_vals[i]:,.1f}{main_unit}"
         top_txt = f"{top_vals[i]:,.1f}{top_unit.strip()}"
         bot_txt = f"{bot_vals[i]:,.1f}{bot_unit.strip()}"
-        ax.text(bar_vals[i], i, f"  {main_txt} ({top_txt} · {bot_txt})", va="center", fontsize=9)
+        ax.text(bar_vals[i], i, f"  {main_txt} ({top_txt} · {bot_txt})", va="center", fontsize=11)
 
     fig.suptitle(title, fontsize=14, fontweight="bold")
-    ax.legend(handles=[h_top, h_bot], loc="lower right", frameon=True)
+    ax.legend(handles=[h_top, h_bot], loc="lower right", frameon=True,fontsize=10.5)
 
     fig.tight_layout(rect=[0, 0.02, 1, 0.95])
 
@@ -999,7 +1002,7 @@ context = {
         "chart_data_uri": chart_data_uri,   # 현재 연령대 차트
     },
     "current_table": render_table_html(top_rows),
-    
+
     # =========================
     # PAGE 2 통계 (⭐ 핵심 추가)
     # =========================
