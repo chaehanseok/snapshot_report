@@ -474,6 +474,8 @@ def fetch_top_rows(
     sex: str,
     sort_key: str = "total_cost",
     limit: int = 7,
+    min_patient_cnt: int | None = None,
+    min_cpp_chewon: int | None = None,  # ✅ 천원 단위로 받음(=DB단위)
 ) -> list[dict]:
     """
     기간(start_year~end_year) + 연령/성별에서 sort_key 기준 상위 N개 질병 rows 반환
@@ -490,6 +492,23 @@ def fetch_top_rows(
         "cost_per_patient": "cost_per_patient DESC",
     }[sort_key]
 
+    # ✅ HAVING 동적 생성
+    having_sql = "HAVING 1=1\n"
+    params = [int(start_year), int(end_year), age_group, sex]
+
+    if min_patient_cnt is not None and min_patient_cnt > 0:
+        having_sql += "  AND SUM(m.patient_cnt) >= ?\n"
+        params.append(int(min_patient_cnt))
+
+    if min_cpp_chewon is not None and min_cpp_chewon > 0:
+        having_sql += (
+            "  AND (CAST(SUM(m.total_cost) AS REAL) "
+            "/ NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
+        )
+        params.append(int(min_cpp_chewon))
+
+    params.append(int(limit))
+
     sql = f"""
     WITH agg AS (
       SELECT
@@ -505,13 +524,14 @@ def fetch_top_rows(
         AND m.age_group = ?
         AND m.sex = ?
       GROUP BY m.disease_code, COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code)
+      {having_sql}
     )
     SELECT * FROM agg
     ORDER BY {order_by}
     LIMIT ?;
     """
 
-    rows = d1_query(sql, [int(start_year), int(end_year), age_group, sex, int(limit)])
+    rows = d1_query(sql, params)
     return rows
 
 
@@ -722,21 +742,7 @@ st.subheader("통계 표시 옵션")
 
 min_year, max_year = fetch_year_range()
 
-STAT_SORT_OPTIONS = {
-    "총 진료비(기간평균)": {"key": "total_cost"},
-    "환자수(기간평균)": {"key": "patient_cnt"},
-    "1인당 진료비(기간평균)": {"key": "cost_per_patient"},
-}
-
-sort_label = st.radio(
-    "Top7 기준",
-    options=list(STAT_SORT_OPTIONS.keys()),
-    index=0,
-    horizontal=True,
-)
-sort_key = STAT_SORT_OPTIONS[sort_label]["key"]
-
-# 기본: 최신년도 1년
+# ✅ 1) 연도 범위를 라디오 위로
 default_end = max_year
 default_start = max_year
 
@@ -758,10 +764,83 @@ with colB:
         step=1,
     )
 
-# start > end 방지 (자동 보정)
 if start_year > end_year:
     start_year, end_year = end_year, start_year
     st.info(f"시작/종료년도를 자동 보정했습니다: {start_year} ~ {end_year}")
+
+# ✅ 2) Top7 기준 라디오
+STAT_SORT_OPTIONS = {
+    "총 진료비(기간평균)": {"key": "total_cost"},
+    "환자수(연평균)": {"key": "patient_cnt"},
+    "1인당 진료비(기간평균)": {"key": "cost_per_patient"},
+}
+
+sort_label = st.radio(
+    "Top7 기준",
+    options=list(STAT_SORT_OPTIONS.keys()),
+    index=0,
+    horizontal=True,
+)
+sort_key = STAT_SORT_OPTIONS[sort_label]["key"]
+
+# ✅ 3) 추가 옵션(조건부) - slider 버전
+# - 최소 환자수: 명
+# - 1인당 진료비 최소: 만원 (기본 100만원)
+MIN_PATIENT_DEFAULT = 100
+MIN_CPP_MAN_DEFAULT = 100  # 만원
+
+min_patient_cnt: int | None = None
+min_cpp_chewon: int | None = None  # DB용(천원)
+
+st.markdown("#### 추가 옵션(필터)")
+
+# slider 범위(원하면 더 조정 가능)
+PATIENT_MIN, PATIENT_MAX, PATIENT_STEP = 0, 2_000_000, 100
+CPP_MIN_MAN, CPP_MAX_MAN, CPP_STEP_MAN = 0, 2_000, 10  # 만원 기준 (0~2,000만원)
+
+if sort_key == "total_cost":
+    # 총진료비 기준: 최소 환자수 + 1인당 최소
+    c1, c2 = st.columns(2)
+    with c1:
+        min_patient_cnt = st.slider(
+            "최소 환자수(명)",
+            min_value=PATIENT_MIN,
+            max_value=PATIENT_MAX,
+            value=MIN_PATIENT_DEFAULT,
+            step=PATIENT_STEP,
+        )
+    with c2:
+        min_cpp_man = st.slider(
+            "최소 1인당 진료비(만원)",
+            min_value=CPP_MIN_MAN,
+            max_value=CPP_MAX_MAN,
+            value=MIN_CPP_MAN_DEFAULT,
+            step=CPP_STEP_MAN,
+        )
+    min_cpp_chewon = int(min_cpp_man) * 10  # 만원 -> 천원 (1만원=10천원)
+
+elif sort_key == "patient_cnt":
+    # 환자수 기준: 1인당 최소
+    min_cpp_man = st.slider(
+        "최소 1인당 진료비(만원)",
+        min_value=CPP_MIN_MAN,
+        max_value=CPP_MAX_MAN,
+        value=MIN_CPP_MAN_DEFAULT,
+        step=CPP_STEP_MAN,
+    )
+    min_cpp_chewon = int(min_cpp_man) * 10
+
+else:  # cost_per_patient
+    # 1인당 기준: 최소 환자수
+    min_patient_cnt = st.slider(
+        "최소 환자수(명)",
+        min_value=PATIENT_MIN,
+        max_value=PATIENT_MAX,
+        value=MIN_PATIENT_DEFAULT,
+        step=PATIENT_STEP,
+    )
+
+
 
 # ---------------------------------------------------------
 # D1 기반 통계 미리보기 (리포트 미리보기 전에 먼저 노출)
@@ -777,7 +856,16 @@ age_group = AGE_GROUP_MAP.get(age_band, "50_59")
 sex = "M" if gender == "남성" else "F"
 
 try:
-    top_rows = fetch_top_rows(start_year, end_year, age_group, sex, sort_key=sort_key, limit=7)
+    top_rows = fetch_top_rows(
+    start_year=int(start_year),
+    end_year=int(end_year),
+    age_group=age_group,
+    sex=sex,
+    sort_key=sort_key,
+    limit=7,
+    min_patient_cnt=min_patient_cnt,
+    min_cpp_chewon=min_cpp_chewon,
+)
 except Exception as e:
     st.error(f"D1 통계 조회 실패: {e}")
     top_rows = []
