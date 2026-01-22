@@ -199,7 +199,7 @@ def build_top7_combo_chart_data_uri(
     basis: str,
 ) -> str:
     """
-    rows: fetch_top_rows() 결과
+    rows:
       - disease_code
       - disease_name_ko
       - patient_cnt (명)
@@ -207,17 +207,26 @@ def build_top7_combo_chart_data_uri(
       - cost_per_patient (천원)
 
     basis:
-      - "total_cost"        : 총진료비(기간합)
-      - "patient_cnt"       : 환자수(기간합)
-      - "cost_per_patient"  : 1인당 진료비(기간평균)
+      - "total_cost"        : 막대=총진료비(기간합)
+      - "patient_cnt"       : 막대=환자수(기간합)
+      - "cost_per_patient"  : 막대=1인당 진료비(기간평균)
+
+    출력:
+      - 막대 1개(기준)
+      - 선 2개(나머지 두 지표)
+      - 축은 3지표를 모두 한 화면에 담기 위해 3축이 필요하므로,
+        (막대축 1개 + 보조축 2개)로 구성하고 범례로 명확화
     """
+    from io import BytesIO
+    import base64
     import matplotlib.pyplot as plt
     from matplotlib.ticker import FuncFormatter
 
-    configure_matplotlib_korean_font()
-
     if not rows:
         return ""
+
+    # ✅ 한글 폰트 적용 (너가 이미 만들어둔 함수)
+    configure_matplotlib_korean_font()
 
     # -----------------------
     # Unit conversions
@@ -231,120 +240,118 @@ def build_top7_combo_chart_data_uri(
         return float(x or 0) / 10.0
 
     # -----------------------
-    # Prepare labels/values
+    # Prepare values
     # -----------------------
-    disease_labels = []
-    disease_codes = []
-    total_cost_억원 = []
+    labels = []
+    total_cost_eok = []
     patient_cnt = []
-    cpp_만원 = []
+    cpp_man = []
 
     for r in rows:
         code = (r.get("disease_code") or "").strip()
         name = (r.get("disease_name_ko") or "").strip() or code or "질병"
-        disease_codes.append(code)
-        # 라벨에 코드까지 같이 표시하면 상담 시 더 명확해짐(원하면 제거 가능)
-        disease_labels.append(f"{name} ({code})" if code else name)
+        labels.append(f"{name} ({code})" if code else name)
 
         patient_cnt.append(float(r.get("patient_cnt") or 0))
-        total_cost_억원.append(to_억원_from_천원(float(r.get("total_cost") or 0)))
-        cpp_만원.append(to_만원_from_천원(float(r.get("cost_per_patient") or 0)))
+        total_cost_eok.append(to_억원_from_천원(float(r.get("total_cost") or 0)))
+        cpp_man.append(to_만원_from_천원(float(r.get("cost_per_patient") or 0)))
+
+    # Top1이 위로 오게 reverse
+    labels = labels[::-1]
+    total_cost_eok = total_cost_eok[::-1]
+    patient_cnt = patient_cnt[::-1]
+    cpp_man = cpp_man[::-1]
+
+    y = list(range(len(labels)))
 
     # -----------------------
-    # Choose bar/line by basis
-    # (원칙: 막대 = 기준, 선 = 보조)
+    # Choose which is bar, which are two lines
     # -----------------------
+    # bar = basis, line1/line2 = other two
     if basis == "total_cost":
-        bar_vals = total_cost_억원
+        bar_vals = total_cost_eok
         bar_label = "총 진료비(기간합) [억원]"
-        line_vals = patient_cnt
-        line_label = "환자수(기간합) [명]"
-        line_axis = "top"  # 상단 축에 선(환자수)
+        line1_vals, line1_label = patient_cnt, "환자수(기간합) [명]"
+        line2_vals, line2_label = cpp_man, "1인당 진료비(기간평균) [만원]"
+        bar_fmt = FuncFormatter(lambda x, p=None: f"{x:.1f}")
+        line1_fmt = FuncFormatter(lambda x, p=None: f"{int(x):,}")
+        line2_fmt = FuncFormatter(lambda x, p=None: f"{x:.1f}")
 
     elif basis == "patient_cnt":
         bar_vals = patient_cnt
         bar_label = "환자수(기간합) [명]"
-        line_vals = total_cost_억원
-        line_label = "총 진료비(기간합) [억원]"
-        line_axis = "top"  # 상단 축에 선(총진료비)
+        line1_vals, line1_label = total_cost_eok, "총 진료비(기간합) [억원]"
+        line2_vals, line2_label = cpp_man, "1인당 진료비(기간평균) [만원]"
+        bar_fmt = FuncFormatter(lambda x, p=None: f"{int(x):,}")
+        line1_fmt = FuncFormatter(lambda x, p=None: f"{x:.1f}")
+        line2_fmt = FuncFormatter(lambda x, p=None: f"{x:.1f}")
 
-    else:  # "cost_per_patient"
-        bar_vals = cpp_만원
+    else:  # cost_per_patient
+        bar_vals = cpp_man
         bar_label = "1인당 진료비(기간평균) [만원]"
-        line_vals = patient_cnt
-        line_label = "환자수(기간합) [명]"
-        line_axis = "top"
-
-    # Y축은 위에서 아래로 보기 좋게 (Top1이 맨 위)
-    # rows가 이미 DESC 정렬이라 가정 -> 그대로 그리면 Top1이 아래로 가므로 뒤집음
-    disease_labels = disease_labels[::-1]
-    bar_vals = bar_vals[::-1]
-    line_vals = line_vals[::-1]
-    patient_cnt_rev = patient_cnt[::-1]
-    total_cost_억원_rev = total_cost_억원[::-1]
-    cpp_만원_rev = cpp_만원[::-1]
-
-    y = list(range(len(disease_labels)))
+        line1_vals, line1_label = patient_cnt, "환자수(기간합) [명]"
+        line2_vals, line2_label = total_cost_eok, "총 진료비(기간합) [억원]"
+        bar_fmt = FuncFormatter(lambda x, p=None: f"{x:.1f}")
+        line1_fmt = FuncFormatter(lambda x, p=None: f"{int(x):,}")
+        line2_fmt = FuncFormatter(lambda x, p=None: f"{x:.1f}")
 
     # -----------------------
     # Plot
     # -----------------------
     plt.close("all")
-    fig, ax_bar = plt.subplots(figsize=(12.5, 5.2), dpi=200)
+    fig, ax_bar = plt.subplots(figsize=(12.8, 5.4), dpi=200)
 
-    # 막대
-    ax_bar.barh(y, bar_vals)
+    # 막대(기준)
+    bar = ax_bar.barh(y, bar_vals)
     ax_bar.set_yticks(y)
-    ax_bar.set_yticklabels(disease_labels)
+    ax_bar.set_yticklabels(labels)
     ax_bar.set_xlabel(bar_label)
-    ax_bar.grid(axis="x", linestyle="--", alpha=0.4)
+    ax_bar.xaxis.set_major_formatter(bar_fmt)
+    ax_bar.grid(axis="x", linestyle="--", alpha=0.35)
 
-    # 보조축 (선)
-    ax_line = ax_bar.twiny() if line_axis == "top" else ax_bar.twinx()
-    ax_line.plot(line_vals, y, marker="o", linewidth=2)
-    ax_line.set_xlabel(line_label)
+    # 선1 (상단 x축)
+    ax_top = ax_bar.twiny()
+    line1 = ax_top.plot(line1_vals, y, marker="o", linewidth=2.2)
+    ax_top.set_xlabel(line1_label)
+    ax_top.xaxis.set_major_formatter(line1_fmt)
 
-    # 숫자 포맷터
-    def fmt_int(x, pos=None):
-        return f"{int(x):,}"
+    # 선2 (또 하나의 상단 x축을 살짝 위로 띄워서 3축 구성)
+    ax_top2 = ax_bar.twiny()
+    ax_top2.spines["top"].set_position(("axes", 1.12))  # 위로 살짝 올림
+    line2 = ax_top2.plot(line2_vals, y, marker="o", linewidth=2.2, linestyle="--")
+    ax_top2.set_xlabel(line2_label)
+    ax_top2.xaxis.set_major_formatter(line2_fmt)
 
-    def fmt_억원(x, pos=None):
-        return f"{x:.1f}"
+    # ✅ 범례(막대+선2)
+    # 막대는 여러 개이므로 대표 handle 하나만 사용
+    handles = [bar[0], line1[0], line2[0]]
+    labels_legend = [bar_label, line1_label, line2_label]
+    ax_bar.legend(handles, labels_legend, loc="lower right", frameon=True)
 
-    def fmt_만원(x, pos=None):
-        return f"{x:.1f}"
-
-    # 막대축/선축 포맷
-    if basis == "total_cost":
-        ax_bar.xaxis.set_major_formatter(FuncFormatter(fmt_억원))
-        ax_line.xaxis.set_major_formatter(FuncFormatter(fmt_int))
-    elif basis == "patient_cnt":
-        ax_bar.xaxis.set_major_formatter(FuncFormatter(fmt_int))
-        ax_line.xaxis.set_major_formatter(FuncFormatter(fmt_억원))
-    else:  # cost_per_patient
-        ax_bar.xaxis.set_major_formatter(FuncFormatter(fmt_만원))
-        ax_line.xaxis.set_major_formatter(FuncFormatter(fmt_int))
-
-    # 각 막대 끝에 보조 정보 라벨(읽기 좋아짐)
-    # 기준에 따라 표시 조합을 바꿈
-    for i, (bv, pc, tc, cp) in enumerate(zip(bar_vals, patient_cnt_rev, total_cost_억원_rev, cpp_만원_rev)):
-        # i는 y index
-        if basis == "patient_cnt":
-            # 막대=환자수, 옆에 총진료비/1인당 표시
-            ax_bar.text(bv, i, f"  {int(pc):,}명 · {tc:.1f}억 · {cp:.1f}만", va="center", fontsize=9)
-        elif basis == "total_cost":
-            ax_bar.text(bv, i, f"  {tc:.1f}억 · {int(pc):,}명 · {cp:.1f}만", va="center", fontsize=9)
-        else:
-            ax_bar.text(bv, i, f"  {cp:.1f}만 · {int(pc):,}명 · {tc:.1f}억", va="center", fontsize=9)
+    # 막대 끝 라벨 (3지표 요약 한 줄)
+    for i in range(len(labels)):
+        # 현재 i는 y index (reverse 이후 기준)
+        tc = total_cost_eok[i]
+        pc = patient_cnt[i]
+        cp = cpp_man[i]
+        ax_bar.text(
+            bar_vals[i],
+            i,
+            f"  {tc:.1f}억 · {int(pc):,}명 · {cp:.1f}만",
+            va="center",
+            fontsize=9,
+        )
 
     fig.suptitle(title, fontsize=14, fontweight="bold")
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
 
     buf = BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
     plt.close(fig)
+
     png_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{png_b64}"
+
 
 
 STAT_SORT_OPTIONS = {
