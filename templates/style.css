@@ -567,14 +567,23 @@ html, body{
   object-fit: contain;
 }
 
-/* 2페이지 로고 전용 헤더 */
+/* 2페이지 로고 헤더: 로고를 반드시 오른쪽에 고정 */
 .header--logo-only {
-  padding-top: 12px;
-  padding-bottom: 12px;
+  display: flex;
+  justify-content: flex-end;   /* 🔑 핵심 */
+  align-items: center;
+  padding: 12px 20px;
 }
 
-/* 왼쪽 영역 비움 */
+/* 왼쪽 영역은 공간 차지하지 않게 */
 .header--logo-only .header-left {
   display: none;
+}
+
+/* 오른쪽 로고 영역 */
+.header--logo-only .header-right {
+  display: flex;
+  justify-content: flex-end;
+  width: auto;
 }
 
