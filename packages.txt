@@ -21,3 +21,5 @@ libxrender1
 libdrm2
 ca-certificates
 fonts-noto-cjk
+libfreetype6
+libpng16-16
