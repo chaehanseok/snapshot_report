@@ -566,3 +566,15 @@ html, body{
   height: 28px;
   object-fit: contain;
 }
+
+/* 2페이지 로고 전용 헤더 */
+.header--logo-only {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+/* 왼쪽 영역 비움 */
+.header--logo-only .header-left {
+  display: none;
+}
+
