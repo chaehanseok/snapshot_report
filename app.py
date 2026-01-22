@@ -371,9 +371,12 @@ def build_top7_combo_chart_data_uri(
     ax_top = ax.twiny()
     ax_bottom = ax.twiny()
 
-    # positions
+    # positions: top은 살짝 위로, bottom은 "표에 붙게" 아주 살짝 아래로만
     ax_top.spines["top"].set_position(("axes", 1.02))
-    ax_bottom.spines["bottom"].set_position(("axes", -0.10))
+
+    # ✅ 핵심: -0.10 → -0.02 (거의 붙이는 느낌)
+    ax_bottom.spines["bottom"].set_position(("axes", -0.02))
+
     ax_bottom.xaxis.set_ticks_position("bottom")
     ax_bottom.xaxis.set_label_position("bottom")
 
@@ -383,6 +386,10 @@ def build_top7_combo_chart_data_uri(
         a.spines["right"].set_visible(False)
     ax_top.spines["bottom"].set_visible(False)
     ax_bottom.spines["top"].set_visible(False)
+
+    # ✅ tick/label pad도 줄이면 더 "붙어" 보임
+    ax_top.tick_params(axis="x", top=True, labeltop=True, direction="out", pad=2)
+    ax_bottom.tick_params(axis="x", bottom=True, labelbottom=True, direction="out", pad=2)
 
     # unpack aux definitions
     aux_top = aux1 if aux1[4] == "top" else aux2
