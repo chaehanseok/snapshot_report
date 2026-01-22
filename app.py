@@ -465,6 +465,15 @@ STAT_SORT_OPTIONS = {
     "1인당 진료비(기간평균)": {"key": "cost_per_patient"},
 }
 
+AFTER_AGE_GROUPS = {
+    "20대": ["30_39", "40_49", "50_59", "60_69", "70_79", "80_plus"],
+    "30대": ["40_49", "50_59", "60_69", "70_79", "80_plus"],
+    "40대": ["50_59", "60_69", "70_79", "80_plus"],
+    "50대": ["60_69", "70_79", "80_plus"],
+    "60대": ["70_79", "80_plus"],
+    "70대": ["80_plus"],
+}
+
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def fetch_top_rows(
@@ -474,15 +483,9 @@ def fetch_top_rows(
     sex: str,
     sort_key: str = "total_cost",
     limit: int = 10,
-    min_patient_cnt: int | None = None,
-    min_cpp_chewon: int | None = None,  # ✅ 천원 단위로 받음(=DB단위)
+    min_patient_cnt: int | None = None,   # 연평균 '명'
+    min_cpp_chewon: int | None = None,    # '천원' (1인당)
 ) -> list[dict]:
-    """
-    기간(start_year~end_year) + 연령/성별에서 sort_key 기준 상위 N개 질병 rows 반환
-    sort_key: total_cost | patient_cnt | cost_per_patient
-    반환 컬럼:
-      disease_code, disease_name_ko, patient_cnt, total_cost(천원), cost_per_patient(천원)
-    """
     if sort_key not in ("total_cost", "patient_cnt", "cost_per_patient"):
         sort_key = "total_cost"
 
@@ -492,19 +495,20 @@ def fetch_top_rows(
         "cost_per_patient": "cost_per_patient DESC",
     }[sort_key]
 
-    # ✅ HAVING 동적 생성
+    years = max(1, int(end_year) - int(start_year) + 1)
+
     having_sql = "HAVING 1=1\n"
     params = [int(start_year), int(end_year), age_group, sex]
 
-    if min_patient_cnt is not None and min_patient_cnt > 0:
-        having_sql += "  AND SUM(m.patient_cnt) >= ?\n"
+    # ✅ 최소 환자수: 연평균 기준으로 필터
+    if min_patient_cnt is not None and int(min_patient_cnt) > 0:
+        having_sql += "  AND (CAST(SUM(m.patient_cnt) AS REAL) / ?) >= ?\n"
+        params.append(int(years))
         params.append(int(min_patient_cnt))
 
-    if min_cpp_chewon is not None and min_cpp_chewon > 0:
-        having_sql += (
-            "  AND (CAST(SUM(m.total_cost) AS REAL) "
-            "/ NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
-        )
+    # ✅ 최소 1인당(천원): SUM(total_cost)/SUM(patient_cnt)
+    if min_cpp_chewon is not None and int(min_cpp_chewon) > 0:
+        having_sql += "  AND (CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
         params.append(int(min_cpp_chewon))
 
     params.append(int(limit))
@@ -514,8 +518,8 @@ def fetch_top_rows(
       SELECT
         m.disease_code AS disease_code,
         COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
-        SUM(m.patient_cnt) AS patient_cnt,
-        SUM(m.total_cost)  AS total_cost,
+        SUM(m.patient_cnt) AS patient_cnt,           -- 기간합
+        SUM(m.total_cost)  AS total_cost,            -- 기간합(천원)
         CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
       FROM disease_year_age_sex_metrics m
       LEFT JOIN disease d
@@ -530,98 +534,8 @@ def fetch_top_rows(
     ORDER BY {order_by}
     LIMIT ?;
     """
-
-    rows = d1_query(sql, params)
-    return rows
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def fetch_top_rows_after(
-    start_year: int,
-    end_year: int,
-    age_groups: list[str],   # ✅ 이후 연령대 리스트
-    sex: str,
-    sort_key: str = "total_cost",
-    limit: int = 10,
-    min_patient_cnt: int | None = None,
-    min_cpp_chewon: int | None = None,
-) -> list[dict]:
-    """
-    이후 연령대(복수 age_group) 합산 TopN rows 반환
-    - total_cost, patient_cnt 는 '기간합'으로 집계되므로
-      화면/표에서는 필요시 연평균으로 나눠서 표시 (또는 SQL에서 나눔)
-    """
-
-    if not age_groups:
-        return []
-
-    if sort_key not in ("total_cost", "patient_cnt", "cost_per_patient"):
-        sort_key = "total_cost"
-
-    order_by = {
-        "total_cost": "total_cost DESC",
-        "patient_cnt": "patient_cnt DESC",
-        "cost_per_patient": "cost_per_patient DESC",
-    }[sort_key]
-
-    years = max(1, int(end_year) - int(start_year) + 1)
-
-    # ✅ IN (...) 플레이스홀더 구성
-    placeholders = ",".join(["?"] * len(age_groups))
-
-    having_sql = "HAVING 1=1\n"
-    params: list = [int(start_year), int(end_year), sex, *age_groups]
-
-    # (선택) 필터: 최소 환자수
-    if min_patient_cnt is not None and int(min_patient_cnt) > 0:
-        having_sql += "  AND SUM(m.patient_cnt) >= ?\n"
-        params.append(int(min_patient_cnt))
-
-    # (선택) 필터: 최소 1인당 진료비(천원)
-    if min_cpp_chewon is not None and int(min_cpp_chewon) > 0:
-        having_sql += "  AND (CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
-        params.append(int(min_cpp_chewon))
-
-    params.append(int(limit))
-
-    sql = f"""
-    WITH agg AS (
-      SELECT
-        m.disease_code AS disease_code,
-        COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
-
-        -- ✅ 연평균으로 쓰려면 여기서 나눠도 되고(권장)
-        CAST(SUM(m.patient_cnt) AS REAL) / {years} AS patient_cnt,   -- 연평균 환자수
-        CAST(SUM(m.total_cost)  AS REAL) / {years} AS total_cost,    -- 연평균 총진료비(천원)
-
-        -- ✅ 1인당은 기간 전체 기준이 더 자연스럽지만(총/총),
-        -- 연평균으로 나눠도 분자/분모 둘 다 /years라 값은 동일
-        (CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0)) AS cost_per_patient
-      FROM disease_year_age_sex_metrics m
-      LEFT JOIN disease d
-        ON m.disease_code = d.disease_code
-      WHERE m.year BETWEEN ? AND ?
-        AND m.sex = ?
-        AND m.age_group IN ({placeholders})
-      GROUP BY m.disease_code, COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code)
-      {having_sql}
-    )
-    SELECT * FROM agg
-    ORDER BY {order_by}
-    LIMIT ?;
-    """
-
     return d1_query(sql, params)
 
-
-
-AFTER_AGE_GROUPS = {
-    "20대": ["30_39", "40_49", "50_59", "60_69", "70_79", "80_plus"],
-    "30대": ["40_49", "50_59", "60_69", "70_79", "80_plus"],
-    "40대": ["50_59", "60_69", "70_79", "80_plus"],
-    "50대": ["60_69", "70_79", "80_plus"],
-    "60대": ["70_79", "80_plus"],
-    "70대": ["80_plus"],
-}
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def fetch_top_rows_after_age(
@@ -631,14 +545,9 @@ def fetch_top_rows_after_age(
     sex: str,
     sort_key: str = "total_cost",
     limit: int = 10,
-    min_patient_cnt: int | None = None,
-    min_cpp_chewon: int | None = None,
+    min_patient_cnt: int | None = None,   # 연평균 '명'
+    min_cpp_chewon: int | None = None,    # '천원'
 ) -> list[dict]:
-    """
-    이후 연령대(여러 age_group) 합산 통계 TopN
-    - min_patient_cnt, min_cpp_chewon 를 HAVING으로 적용
-    - 캐시 키에 슬라이더 값이 포함되도록 함수 시그니처에 넣음
-    """
     if not after_age_groups:
         return []
 
@@ -651,21 +560,19 @@ def fetch_top_rows_after_age(
         "cost_per_patient": "cost_per_patient DESC",
     }[sort_key]
 
+    years = max(1, int(end_year) - int(start_year) + 1)
     placeholders = ",".join(["?"] * len(after_age_groups))
-
-    # ---- HAVING 동적 구성 (여기서 네가 말한 코드 조각이 들어갈 자리) ----
-    years = int(end_year) - int(start_year) + 1
 
     having_sql = "HAVING 1=1\n"
     params = [int(start_year), int(end_year), sex, *after_age_groups]
 
-    # ✅ 최소 환자수: 연평균 기준으로 필터링
+    # ✅ 최소 환자수: 연평균 기준
     if min_patient_cnt is not None and int(min_patient_cnt) > 0:
-        having_sql += "  AND (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(?, 0)) >= ?\n"
+        having_sql += "  AND (CAST(SUM(m.patient_cnt) AS REAL) / ?) >= ?\n"
         params.append(int(years))
         params.append(int(min_patient_cnt))
 
-    # ✅ 최소 1인당 진료비(천원): 원래대로 (기간평균 개념)
+    # ✅ 최소 1인당(천원)
     if min_cpp_chewon is not None and int(min_cpp_chewon) > 0:
         having_sql += "  AND (CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
         params.append(int(min_cpp_chewon))
@@ -677,10 +584,9 @@ def fetch_top_rows_after_age(
       SELECT
         m.disease_code AS disease_code,
         COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
-        -- 기간합을 만든 뒤, 연평균으로 변환(연수로 나눔)
-        CAST(SUM(m.patient_cnt) AS REAL) / NULLIF((? - ? + 1), 0) AS patient_cnt,
-        CAST(SUM(m.total_cost)  AS REAL) / NULLIF((? - ? + 1), 0) AS total_cost,
-        CAST(SUM(m.total_cost)  AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
+        SUM(m.patient_cnt) AS patient_cnt,          -- 기간합
+        SUM(m.total_cost)  AS total_cost,           -- 기간합(천원)
+        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
       FROM disease_year_age_sex_metrics m
       LEFT JOIN disease d
         ON m.disease_code = d.disease_code
@@ -694,12 +600,12 @@ def fetch_top_rows_after_age(
     ORDER BY {order_by}
     LIMIT ?;
     """
+    return d1_query(sql, params)
 
-    # 주의: 연평균 계산용 (end-start+1) 파라미터 4개를 앞에 추가
-    years_params = [int(end_year), int(start_year), int(end_year), int(start_year)]
-    final_params = years_params + params
-
-    return d1_query(sql, final_params)
+def pick_emerging_rows(now_rows: list[dict], after_rows: list[dict], limit: int = 5) -> list[dict]:
+    now_codes = { (r.get("disease_code") or "").strip() for r in (now_rows or []) }
+    emerging = [r for r in (after_rows or []) if ((r.get("disease_code") or "").strip() not in now_codes)]
+    return emerging[:limit]
 
 # =========================================================
 # Utilities (rendering)
@@ -1149,6 +1055,29 @@ if after_groups and after_rows:
 else:
     if after_groups:
         st.warning("이후 연령대 합산 조건에서 Top10 데이터가 없습니다. 조건을 완화해 보세요.")
+
+
+emerging_rows = pick_emerging_rows(top_rows, after_rows, limit=5)
+
+if emerging_rows:
+    st.markdown("### 향후 새롭게 부각되는 질병 (현재 Top10에 없음)")
+    with st.expander("신규 부각 질병 상세"):
+        st.dataframe(
+            [
+                {
+                    "질병코드": r.get("disease_code"),
+                    "질병명": r.get("disease_name_ko") or r.get("disease_code"),
+                    "총진료비(연평균, 억원)": f"{chewon_to_eok(r.get('total_cost')/years):,.1f}",
+                    "환자수(연평균, 명)": f"{(float(r.get('patient_cnt') or 0)/years):,.0f}",
+                    "1인당 진료비(만원)": f"{chewon_to_man(r.get('cost_per_patient')):,.1f}",
+                }
+                for r in emerging_rows
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+else:
+    st.info("현재 Top10에 없는 ‘신규 부각 질병’이 없습니다. (현재와 이후가 유사한 패턴)")
 
 
 st.subheader("문구 조정(선택/제한)")
