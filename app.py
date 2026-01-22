@@ -394,9 +394,11 @@ def build_top7_combo_chart_data_uri(
     ax_bar.set_yticklabels(labels)
     ax_bar.grid(axis="x", linestyle="--", alpha=0.35)
 
-    # 메인 지표는 타이틀에 노출하므로 축 라벨 제거(요청사항)
+    # 메인 지표는 막대 끝 텍스트 + 타이틀로만 안내
     ax_bar.set_xlabel("")
-    ax_bar.xaxis.set_major_formatter(FuncFormatter(fmt_bar))
+    ax_bar.set_xticks([])
+    ax_bar.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
+
 
     # 보조선#1: 상단 X축
     ax_top = ax_bar.twiny()
@@ -445,17 +447,26 @@ def build_top7_combo_chart_data_uri(
         pc = patient_cnt_avg[i]
         cp = cpp_man[i]
 
-        # 메인 지표 기준으로 맨 앞에 배치
-        if basis == "total_cost":
-            main_txt = f"{tc:.1f}억"
-        elif basis == "patient_cnt":
-            main_txt = f"{int(round(pc)):,}명"
-        else:
-            main_txt = f"{cp:.1f}만"
+        # bv = 막대값(메인), pc=환자수(명), tc=총진료비(억원), cp=1인당(만원)
 
-        # 보조는 작게 함께(가독성)
-        aux_txt = f" (환자 {int(round(pc)):,}명 · 총 {tc:.1f}억 · 1인당 {cp:.1f}만)"
-        ax_bar.text(bv, i, f"  {main_txt}{aux_txt}", va="center", fontsize=9)
+        if basis == "patient_cnt":
+            main_txt = f"{int(pc):,}명"
+            sub_txt  = f"(총 {tc:.1f}억 · 1인당 {cp:.1f}만)"
+
+        elif basis == "total_cost":
+            main_txt = f"{tc:.1f}억"
+            sub_txt  = f"(환자 {int(pc):,}명 · 1인당 {cp:.1f}만)"
+
+        else:  # "cost_per_patient"
+            main_txt = f"{cp:.1f}만"
+            sub_txt  = f"(환자 {int(pc):,}명 · 총 {tc:.1f}억)"
+
+        ax_bar.text(
+            bv, i,
+            f"  {main_txt} {sub_txt}",
+            va="center",
+            fontsize=9
+        )
 
     # -------------------------------------------------
     # 타이틀: 메인 지표 안내 포함(요청사항)
