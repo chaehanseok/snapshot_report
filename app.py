@@ -1099,7 +1099,7 @@ else:
     st.info("현재 Top10에 없는 ‘신규 부각 질병’이 없습니다. (현재와 이후가 유사한 패턴)")
 
 
-st.subheader("문구 조정(표준 문구를 고객만의 문구로 수정가능합니다.)")
+st.subheader("문구 조정(표준 문구를 커스터마이징 가능합니다.)")
 summary_lines = segment["summary_lines"][:]
 gap_questions = segment["gap_questions"][:]
 cta_text = segment["cta"]
