@@ -146,7 +146,7 @@ html, body{
 /* =========================
    Section title
    ========================= */
-.section{ margin-top:10px; }
+.section{ margin-top:14px; }
 
 .section-title{
   display:flex;
@@ -393,6 +393,17 @@ html, body{
 /* =========================
    Page control
    ========================= */
+.intro {
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+.intro-text {
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.45;
+}
+
 .page {
   page-break-inside: avoid;
 }
