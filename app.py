@@ -16,6 +16,16 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from matplotlib import font_manager as fm
 
+
+def debug_font(path: Path, label: str):
+    st.write(label, "exists:", path.exists())
+    if path.exists():
+        b = path.read_bytes()[:4]
+        st.write(label, "size:", path.stat().st_size, "header:", b)
+
+debug_font(FONT_DIR/"NotoSansKR-Regular.ttf", "REG")
+debug_font(FONT_DIR/"NotoSansKR-Bold.ttf", "BOLD")
+
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
 # =========================================================
