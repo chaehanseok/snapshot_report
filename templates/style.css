@@ -389,3 +389,44 @@ html, body{
   height:auto;
   display:block;
 }
+
+/* =========================
+   Page control
+   ========================= */
+.page {
+  page-break-inside: avoid;
+}
+
+.page-break {
+  page-break-before: always;
+}
+
+/* =========================
+   Summary (Page 1 bottom)
+   ========================= */
+.summary-box {
+  background:#f4f7fb;
+  padding:12px 14px;
+  border-radius:8px;
+  margin-top:12px;
+}
+
+/* =========================
+   Emerging diseases
+   ========================= */
+.emerging {
+  background:#fafafa;
+  padding:10px 14px;
+  border-radius:8px;
+}
+
+/* =========================
+   Chart image
+   ========================= */
+.stats-chart {
+  width:100%;
+  max-width:720px;
+  height:auto;
+  display:block;
+  margin:0 auto;
+}

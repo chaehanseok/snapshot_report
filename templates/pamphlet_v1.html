@@ -8,159 +8,136 @@
 </head>
 
 <body>
-  <div class="preview-viewport">
-    <div class="page">
-      <div class="topband"></div>
+<div class="preview-viewport">
 
-      <header class="header">
-        <div class="header-left">
-          <div class="label">LIFE REPORT</div>
+  <!-- =========================
+       PAGE 1 : 현재 연령대
+       ========================= -->
+  <div class="page">
 
-          <div class="title">
-            {{ customer.name }} 고객님을 위한<br/>
-            <strong>{{ customer.age_band }} · {{ customer.gender }}</strong> 보장 점검 안내
-          </div>
+    <div class="topband"></div>
 
-          <div class="subtitle">
-            보험 가입 여부보다 “현재 기준 최소 구조”가 갖춰져 있는지 점검이 중요합니다.
-          </div>
-
-          <div class="meta-inline">
-            기준연도 {{ stats.base_year }} · {{ stats.source }} · v{{ version }}
-          </div>
+    <header class="header">
+      <div class="header-left">
+        <div class="label">LIFE REPORT</div>
+        <div class="title">
+          {{ customer.name }} 고객님을 위한<br/>
+          <strong>{{ customer.age_band }} · {{ customer.gender }}</strong> 보장 점검 안내
         </div>
-
-        <div class="header-right">
-          <div class="logo">
-            {% if logo_data_uri %}
-              <img src="{{ logo_data_uri }}" alt="Mirae Asset" />
-            {% endif %}
-          </div>
+        <div class="subtitle">
+          현재 연령대 기준 주요 질병 통계를 기반으로 점검합니다.
         </div>
-      </header>
+        <div class="meta-inline">
+          기준연도 {{ stats.base_year }} · {{ stats.source }} · v{{ version }}
+        </div>
+      </div>
 
-      <section class="section">
-        <h2 class="section-title">요약</h2>
-        <ul class="bullets">
-          {% for line in segment.summary_lines %}
-            <li>{{ line }}</li>
-          {% endfor %}
-        </ul>
-      </section>
-
-      <section class="section">
-        <h2 class="section-title">현황 통계 예시</h2>
-
-        {% if stats.chart_data_uri %}
-          <div class="chart-box">
-            <img class="stats-chart" src="{{ stats.chart_data_uri }}" alt="Top10 통계 차트" />
-            <div class="note">
-              * 기준: {{ stats.base_year }} · {{ stats.source }} · Top10 기준: {{ stats.top7_basis }}
-            </div>
-          </div>
-        {% else %}
-          <div class="note">
-            * 통계 차트를 생성할 데이터가 없습니다.
-          </div>
-        {% endif %}
-          <div class="note">
-            * 위 내용은 동일 연령·성별 집단의 통계 기반 요약이며, 개인별 상황에 따라 달라질 수 있습니다.
-          </div>
-      </section>
-
-      <section class="section">
-        <div class="grid2">
-          <div>
-            <h2 class="section-title">점검 질문</h2>
-            <ol class="questions">
-              {% for q in segment.gap_questions %}
-                <li>{{ q }}</li>
-              {% endfor %}
-            </ol>
-          </div>    
-
-          <div>
-            <h2 class="section-title">필요 보장 구조(개요)</h2>
-            <div class="table">
-              <div class="row head">
-                <div class="cell col1">보장 영역</div>
-                <div class="cell col2">점검이 필요한 이유</div>
-              </div>
-              {% for r in structure_rows %}
-              <div class="row">
-                <div class="cell col1">{{ r.area }}</div>
-                <div class="cell col2">{{ r.reason }}</div>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>    
-      </section>
-      
-      <section class="cta">
-        <div class="cta__headline">확인하고 싶으시면, 한 번에 점검해보시죠.</div>
-        <div class="cta__body">{{ segment.cta }}</div>
-      </section>
-
-      <section class="planner">
-        <div class="planner-box">
-          <div class="planner-title">상담 및 보장 점검 문의</div>
-          <div class="planner-name">{{ planner.name }}</div>
-          <div class="planner-org">{{ planner.org_display }}</div>
-          <div class="planner-phone">연락처 : {{ planner.phone_display }}</div>
-          {% if planner.email %}
-            <div class="planner-email">이메일 : {{ planner.email }}</div>
+      <div class="header-right">
+        <div class="logo">
+          {% if logo_data_uri %}
+            <img src="{{ logo_data_uri }}" alt="Mirae Asset" />
           {% endif %}
         </div>
-      </section>
+      </div>
+    </header>
 
-      <footer class="footer">
-        <div class="footer__disclaimer">{{ footer.disclaimer }}</div>
-        <div class="footer__legal">{{ footer.legal_note }}</div>
-      </footer>
-    </div>
-  </div> 
+    <!-- 현재 연령대 통계 -->
+    <section class="section">
+      <h2 class="section-title">현재 연령대 주요 질병 통계</h2>
 
-  <script>
-  (function () {
-    const viewport = document.querySelector(".preview-viewport");
-    const page = document.querySelector(".page");
-    if (!viewport || !page) return;
+      {% if stats.chart_data_uri %}
+      <div class="chart-box">
+        <img class="stats-chart" src="{{ stats.chart_data_uri }}" />
+        <div class="note">
+          * 기준: {{ stats.base_year }} · Top15 · {{ stats.top7_basis }}
+        </div>
+      </div>
+      {% endif %}
+    </section>
 
-    function setFrameHeight(px) {
-      try {
-        window.parent.postMessage(
-          {
-            isStreamlitMessage: true,
-            type: "streamlit:setFrameHeight",
-            height: px
-          },
-          "*"
-        );
-      } catch (e) {}
-    }
+    <!-- 현재 연령대 테이블 -->
+    <section class="section">
+      {{ current_table | safe }}
+    </section>
 
-    function fit() {
-      const vw = viewport.clientWidth;
-      const pw = page.scrollWidth;
-      const scale = Math.min(1, vw / pw);
+    <!-- 요약 -->
+    <section class="section summary-box">
+      <h2 class="section-title">연령대 핵심 요약</h2>
+      <ul class="bullets">
+        {% for line in segment.summary_lines %}
+          <li>{{ line }}</li>
+        {% endfor %}
+      </ul>
+    </section>
 
-      page.style.transform = `scale(${scale})`;
-      page.style.transformOrigin = "top left";
+  </div>
 
-      const h = Math.ceil(page.scrollHeight * scale);
-      viewport.style.height = h + "px";
+  <!-- =========================
+       PAGE BREAK
+       ========================= -->
+  <div class="page-break"></div>
 
-      // 핵심: iframe 자체 높이를 Streamlit에 요청
-      setFrameHeight(h + 20);
-    }
+  <!-- =========================
+       PAGE 2 : 준비해야 할 것
+       ========================= -->
+  <div class="page">
 
-    new ResizeObserver(fit).observe(viewport);
-    window.addEventListener("load", fit);
-    fit();
-  })();
-  </script>
+    <!-- 이후 연령대 -->
+    <section class="section">
+      <h2 class="section-title">이후 연령대 질병 통계 (미래 위험)</h2>
 
+      {% if after_chart_data_uri %}
+      <div class="chart-box">
+        <img class="stats-chart" src="{{ after_chart_data_uri }}" />
+      </div>
+      {% endif %}
 
+      {{ after_table | safe }}
+    </section>
+
+    <!-- 신규 부각 -->
+    {% if emerging_table %}
+    <section class="section emerging">
+      <h2 class="section-title">향후 새롭게 부각되는 질병</h2>
+      {{ emerging_table | safe }}
+    </section>
+    {% endif %}
+
+    <!-- 점검 질문 -->
+    <section class="section questions-box">
+      <h2 class="section-title">보장 점검 질문</h2>
+      <ol class="questions">
+        {% for q in segment.gap_questions %}
+          <li>{{ q }}</li>
+        {% endfor %}
+      </ol>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+      <div class="cta__headline">지금 기준으로 한 번 점검해보세요.</div>
+      <div class="cta__body">{{ segment.cta }}</div>
+    </section>
+
+    <!-- 상담자 -->
+    <section class="planner">
+      <div class="planner-box">
+        <div class="planner-title">상담 및 보장 점검 문의</div>
+        <div class="planner-name">{{ planner.name }}</div>
+        <div class="planner-org">{{ planner.org_display }}</div>
+        <div class="planner-phone">연락처 : {{ planner.phone_display }}</div>
+        {% if planner.email %}
+          <div class="planner-email">이메일 : {{ planner.email }}</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer__disclaimer">{{ footer.disclaimer }}</div>
+      <div class="footer__legal">{{ footer.legal_note }}</div>
+    </footer>
+
+  </div>
+</div>
 </body>
 </html>
