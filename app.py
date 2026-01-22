@@ -653,8 +653,8 @@ st.subheader("통계 표시 옵션")
 min_year, max_year = fetch_year_range()
 
 STAT_SORT_OPTIONS = {
-    "총 진료비(기간합)": {"key": "total_cost"},
-    "환자수(기간합)": {"key": "patient_cnt"},
+    "총 진료비(기간평균)": {"key": "total_cost"},
+    "환자수(기간평균)": {"key": "patient_cnt"},
     "1인당 진료비(기간평균)": {"key": "cost_per_patient"},
 }
 
