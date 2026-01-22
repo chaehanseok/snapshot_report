@@ -781,7 +781,7 @@ if start_year > end_year:
     start_year, end_year = end_year, start_year
     st.info(f"시작/종료년도를 자동 보정했습니다: {start_year} ~ {end_year}")
 
-# ✅ 2) Top7 기준 라디오
+# ✅ 2) Top10 기준 라디오
 STAT_SORT_OPTIONS = {
     "총 진료비(기간평균)": {"key": "total_cost"},
     "환자수(연평균)": {"key": "patient_cnt"},
@@ -789,7 +789,7 @@ STAT_SORT_OPTIONS = {
 }
 
 sort_label = st.radio(
-    "Top7 기준",
+    "Top10 기준",
     options=list(STAT_SORT_OPTIONS.keys()),
     index=0,
     horizontal=True,
@@ -887,7 +887,7 @@ except Exception as e:
 sex_display = "남성" if sex == "M" else "여성"
 
 chart_title = (
-    f"Top7 질병 통계 "
+    f"Top10 질병 통계 "
     f"({start_year}~{end_year} · {age_band} · {sex_display} · 기준: {sort_label})"
 )
 chart_data_uri = build_top7_combo_chart_data_uri(
