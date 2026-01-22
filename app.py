@@ -473,7 +473,7 @@ def fetch_top_rows(
     age_group: str,
     sex: str,
     sort_key: str = "total_cost",
-    limit: int = 7,
+    limit: int = 10,
     min_patient_cnt: int | None = None,
     min_cpp_chewon: int | None = None,  # ✅ 천원 단위로 받음(=DB단위)
 ) -> list[dict]:
@@ -719,7 +719,7 @@ stats_db = load_json(STATS_PATH)
 planner_org_display = org_display(BRAND_NAME, planner.get("org", ""))
 planner_phone_display = format_phone_3_4_4(planner["phone"])
 
-st.success("설계사 인증 완료")
+st.success("미래에셋금융서비스 소속 인증 완료")
 st.write(f"FC명 : **{planner['name']}**")
 st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
@@ -736,7 +736,10 @@ with col2:
     gender = st.selectbox("성별", ["남성", "여성"])
 
 with col3:
-    age_band = st.selectbox("연령대", ["20대", "30대", "40대", "50대", "60대 이상"])
+    age_band = st.selectbox(
+    "연령대",
+    ["20대", "30대", "40대", "50대", "60대", "70대"]
+)
 
 
 key = segment_key(age_band, gender)
@@ -860,7 +863,8 @@ AGE_GROUP_MAP = {
     "30대": "30_39",
     "40대": "40_49",
     "50대": "50_59",
-    "60대 이상": "60_69",
+    "60대": "60_69",
+    "70대": "70_79",
 }
 age_group = AGE_GROUP_MAP.get(age_band, "50_59")
 sex = "M" if gender == "남성" else "F"
@@ -872,7 +876,7 @@ try:
     age_group=age_group,
     sex=sex,
     sort_key=sort_key,
-    limit=7,
+    limit=10,
     min_patient_cnt=min_patient_cnt,
     min_cpp_chewon=min_cpp_chewon,
 )
@@ -910,7 +914,7 @@ def krw_to_man(n: float | int) -> float:
     return round((float(n or 0) * 1_000) / 1e4, 1)
 
 
-with st.expander("통계 상세 (Top7 테이블)"):
+with st.expander("통계 상세 (Top10 테이블)"):
     st.dataframe(
         [
             {
@@ -973,7 +977,7 @@ context = {
     },
     "stats": {
         "base_year": f"{start_year}~{end_year}",
-        "source": stats_db.get("source", "공식 보건의료 통계(요약)"),
+        "source": stats_db.get("source", "보건의료빅데이터개방시스템 - 건강보험심사평가원(요약)"),
         "top7_basis": sort_label,
         "chart_data_uri": chart_data_uri,
     },
