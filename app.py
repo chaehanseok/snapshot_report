@@ -653,6 +653,22 @@ def build_final_html_for_both(context: Dict[str, Any]) -> str:
     html = inject_inline_css(html, css_text, str(context["css_path"]))
     return html
 
+def calc_table_height(
+    row_count: int,
+    row_height: int = 35,
+    header_height: int = 40,
+    min_height: int = 120,
+    max_height: int = 600,
+) -> int:
+    """
+    Streamlit dataframe 높이를 row 개수에 따라 자동 계산
+    - row_height: 데이터 행 1줄 높이(px)
+    - header_height: 헤더 높이(px)
+    - min/max: 과도한 축소/확대 방지
+    """
+    h = header_height + row_height * max(row_count, 1)
+    return max(min_height, min(h, max_height))
+
 
 # =========================================================
 # PDF generation (Chromium via Playwright)
@@ -761,9 +777,7 @@ age_group = AGE_GROUP_MAP.get(age_band, "50_59")
 sex = "M" if gender == "남성" else "F"
 sex_display = "남성" if sex == "M" else "여성"
 
-TABLE_ROW_HEIGHT = 35
-TABLE_HEADER = 40
-TABLE_HEIGHT = TABLE_HEADER + TABLE_ROW_HEIGHT * 15
+table_height = calc_table_height(len(top_rows))
 
 st.markdown("---")
 st.markdown("#### 고객 연령대 통계 (현재)")
@@ -805,7 +819,7 @@ with st.expander("통계 상세 (Top15 테이블) - 현재 연령대",expanded=T
         ],
         use_container_width=True,
         hide_index=True,
-        height=TABLE_HEIGHT,
+        height=table_height,
     )
 
 # -------------------------
@@ -852,7 +866,7 @@ if after_groups and after_rows:
             ],
             use_container_width=True,
             hide_index=True,
-            height=TABLE_HEIGHT,
+            height=table_height,
         )
 else:
     if after_groups:
@@ -862,6 +876,7 @@ else:
 # 신규 부각 질병 (현재 Top15에 없음)
 # -------------------------
 emerging_rows = pick_emerging_rows(top_rows, after_rows, limit=5)
+emerging_height = calc_table_height(len(emerging_rows))
 
 if emerging_rows:
     st.markdown("#### 향후 새롭게 부각되는 질병 (현재 Top15에 없음)")
@@ -879,7 +894,7 @@ if emerging_rows:
             ],
             use_container_width=True,
             hide_index=True,
-            height=TABLE_HEIGHT,
+            height=emerging_height,
         )
 else:
     st.info("현재 Top15에 없는 ‘신규 부각 질병’이 없습니다. (현재와 이후가 유사한 패턴)")
