@@ -998,7 +998,8 @@ context = {
         "top7_basis": sort_label,
         "chart_data_uri": chart_data_uri,   # 현재 연령대 차트
     },
-
+    "current_table": render_table_html(top_rows),
+    
     # =========================
     # PAGE 2 통계 (⭐ 핵심 추가)
     # =========================
@@ -1021,22 +1022,11 @@ context = {
     ),
 }
 
-# =========================
-# DEBUG는 반드시 여기서
-# =========================
-st.write("DEBUG after_chart_uri:", after_chart_uri)
-st.write("DEBUG context after key:", context.get("after_chart_data_uri"))
-st.write("DEBUG truthy:", bool(context.get("after_chart_data_uri")))
-
 
 final_html = build_final_html_for_both(context)
 
 st.subheader("미리보기")
 components.html(final_html, height=900, scrolling=True)
-
-st.write("DEBUG after_chart_uri:", after_chart_uri)
-st.write("DEBUG after_chart_uri type:", type(after_chart_uri))
-st.write("DEBUG after_chart_uri truthy:", bool(after_chart_uri))
 
 st.divider()
 st.subheader("확정 및 PDF 출력")

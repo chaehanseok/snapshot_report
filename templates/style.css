@@ -52,16 +52,19 @@ html, body{
    ========================= */
 .preview-viewport{
   width:100%;
-  overflow:hidden; /* 좌우 스크롤 제거 */
+  overflow: visible;   /* 🔑 핵심 */
 }
 
 /* A4 기준 page (PDF/화면 공통 기준점) */
-.page{
-  width:210mm;
-  min-height:297mm;
-  padding:10mm;
-  background:#fff;
+.page {
+  width: 100%;
+  min-height: 1120px;  /* A4 기준 */
+  padding: 40px 48px;
+  box-sizing: border-box;
+  overflow: visible;  /* 🔑 핵심 */
+  page-break-after: always;
 }
+
 
 /* 화면에서는 가운데 정렬 + 그림자 */
 @media screen{
@@ -146,7 +149,10 @@ html, body{
 /* =========================
    Section title
    ========================= */
-.section{ margin-top:14px; }
+.section{ 
+  margin-top:14px;
+  overflow: visible;   /* hidden이면 안 됨 */
+}
 
 .section-title{
   display:flex;
@@ -382,6 +388,7 @@ html, body{
   border-radius:14px;
   padding:10px;
   background:#fff;
+  margin-bottom: 16px;
 }
 
 .chart-img{
@@ -408,8 +415,16 @@ html, body{
   page-break-inside: avoid;
 }
 
+.page:last-child {
+  page-break-after: auto;
+}
+
+
 .page-break {
+  display: block;
   page-break-before: always;
+  break-before: page;
+  height: 0;
 }
 
 /* =========================
