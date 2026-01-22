@@ -777,8 +777,6 @@ age_group = AGE_GROUP_MAP.get(age_band, "50_59")
 sex = "M" if gender == "남성" else "F"
 sex_display = "남성" if sex == "M" else "여성"
 
-table_height = calc_table_height(len(top_rows))
-
 st.markdown("---")
 st.markdown("#### 고객 연령대 통계 (현재)")
 
@@ -793,6 +791,8 @@ try:
 except Exception as e:
     st.error(f"D1 통계 조회 실패: {e}")
     top_rows = []
+
+table_height = calc_table_height(len(top_rows))
 
 chart_title = f"Top15 질병 통계 ({start_year}~{end_year} · {age_band} · {sex_display} · 기준: {sort_label})"
 chart_data_uri = build_top10_combo_chart_data_uri(
