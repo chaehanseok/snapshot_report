@@ -167,20 +167,53 @@ def fetch_year_range() -> tuple[int, int]:
 # matplotlib font fix (Korean)
 # =========================================================
 
-def configure_matplotlib_korean_font():
+@st.cache_resource(show_spinner=False)
+def configure_matplotlib_korean_font() -> str:
+    """
+    Matplotlib 한글 폰트 설정을 '절대 안 죽게' 구성.
+    - 폰트 파일이 0바이트/손상/파싱 실패하면 스킵
+    - 최소 1개라도 성공하면 그 폰트를 matplotlib 기본으로 지정
+    - 모두 실패하면 기본 폰트(DejaVu Sans)로 fallback
+    반환: 최종 적용된 font family name
+    """
+    import matplotlib
+    from matplotlib import font_manager as fm
+
     reg = FONT_DIR / "NotoSansKR-Regular.ttf"
     bold = FONT_DIR / "NotoSansKR-Bold.ttf"
 
-    if reg.exists():
-        fm.fontManager.addfont(str(reg))
-    if bold.exists():
-        fm.fontManager.addfont(str(bold))
+    def is_valid_ttf(p: Path) -> bool:
+        try:
+            # 0바이트/이상치 방어: 정상 ttf면 보통 수백 KB 이상
+            return p.exists() and p.is_file() and p.stat().st_size > 100_000
+        except Exception:
+            return False
 
-    if reg.exists():
-        font_name = fm.FontProperties(fname=str(reg)).get_name()
-        matplotlib.rcParams["font.family"] = font_name
+    loaded_font_name = None
+
+    # 후보를 순서대로 시도 (Regular 우선)
+    for p in [reg, bold]:
+        if not is_valid_ttf(p):
+            continue
+        try:
+            fm.fontManager.addfont(str(p))
+            # addfont 성공했으면 이 파일의 실제 폰트명을 얻어서 family로 지정
+            loaded_font_name = fm.FontProperties(fname=str(p)).get_name()
+            break
+        except Exception:
+            # 파싱 실패(FT2Font)면 그냥 스킵하고 다음 후보 시도
+            continue
+
+    # 최종 적용
+    if loaded_font_name:
+        matplotlib.rcParams["font.family"] = loaded_font_name
+    else:
+        # fallback (앱이 죽지 않는 게 우선)
+        matplotlib.rcParams["font.family"] = "DejaVu Sans"
 
     matplotlib.rcParams["axes.unicode_minus"] = False
+    return matplotlib.rcParams["font.family"]
+
 
 # =========================================================
 # Stats helpers (Top N)
@@ -582,6 +615,10 @@ try:
 except Exception as e:
     st.error(f"접속 검증 실패: {e}")
     st.stop()
+
+st.write("REG", (FONT_DIR / "NotoSansKR-Regular.ttf").exists(), (FONT_DIR / "NotoSansKR-Regular.ttf").stat().st_size if (FONT_DIR / "NotoSansKR-Regular.ttf").exists() else None)
+st.write("BOLD", (FONT_DIR / "NotoSansKR-Bold.ttf").exists(), (FONT_DIR / "NotoSansKR-Bold.ttf").stat().st_size if (FONT_DIR / "NotoSansKR-Bold.ttf").exists() else None)
+
 
 segments_db = load_json(SEGMENTS_PATH)
 stats_db = load_json(STATS_PATH)
