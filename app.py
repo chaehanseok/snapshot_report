@@ -15,7 +15,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
 # =========================================================
-PW_DIR = Path("/tmp/pw-browsers")  # 가장 안전(쓰기 가능)
+PW_DIR = Path("/tmp/pw-browsers")  # Streamlit Cloud에서 가장 안전(쓰기 가능)
 PW_DIR.mkdir(parents=True, exist_ok=True)
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(PW_DIR)
 
@@ -129,7 +129,7 @@ def d1_query(sql: str, params: list) -> list[dict]:
     secrets 필요:
       CF_ACCOUNT_ID
       CF_API_TOKEN
-      CF_D1_DB_ID
+      D1_DATABASE_ID
     """
     account_id = st.secrets["CF_ACCOUNT_ID"]
     api_token = st.secrets["CF_API_TOKEN"]
@@ -153,7 +153,7 @@ def d1_query(sql: str, params: list) -> list[dict]:
 
 
 # =========================================================
-# Stats helpers (Top N cards)
+# Stats helpers (Top N)
 # =========================================================
 def format_krw_compact(n: float | int) -> str:
     n = float(n or 0)
@@ -164,41 +164,79 @@ def format_krw_compact(n: float | int) -> str:
     return f"{n:.0f}"
 
 
+STAT_SORT_OPTIONS = {
+    "총 진료비(연간)": {"key": "total_cost", "label": "연간 진료비"},
+    "환자수(연간)": {"key": "patient_cnt", "label": "환자수"},
+    "1인당 진료비": {"key": "cost_per_patient", "label": "1인당"},
+}
+
+
 @st.cache_data(show_spinner=False, ttl=3600)
-def fetch_top_cards(year: int, age_group: str, sex: str, limit: int = 7) -> list[dict]:
+def fetch_top_cards(
+    year: int,
+    age_group: str,
+    sex: str,
+    sort_key: str = "total_cost",
+    limit: int = 7,
+) -> list[dict]:
     """
-    동일 연도/연령/성별에서 total_cost 기준 상위 N개 질병 카드 생성
+    동일 연도/연령/성별에서 sort_key 기준 상위 N개 질병 카드 생성
     disease 테이블 조인해서 disease_name_ko 표시
+    sort_key: total_cost | patient_cnt | cost_per_patient
     """
-    sql = """
-    SELECT
-      COALESCE(d.disease_name_ko, m.disease_code) AS disease_name_ko,
-      SUM(m.patient_cnt) AS patient_cnt,
-      SUM(m.total_cost)  AS total_cost,
-      CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
-    FROM disease_year_age_sex_metrics m
-    LEFT JOIN disease d
-      ON m.disease_code = d.disease_code
-    WHERE m.year = ?
-      AND m.age_group = ?
-      AND m.sex = ?
-    GROUP BY COALESCE(d.disease_name_ko, m.disease_code)
-    ORDER BY total_cost DESC
+    # 안전장치: 예상 키만 허용
+    if sort_key not in ("total_cost", "patient_cnt", "cost_per_patient"):
+        sort_key = "total_cost"
+
+    # NOTE: ORDER BY는 파라미터 바인딩이 불가하므로 whitelist 방식으로 문자열 삽입
+    order_by = {
+        "total_cost": "total_cost DESC",
+        "patient_cnt": "patient_cnt DESC",
+        "cost_per_patient": "cost_per_patient DESC",
+    }[sort_key]
+
+    sql = f"""
+    WITH agg AS (
+      SELECT
+        m.disease_code AS disease_code,
+        COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
+        SUM(m.patient_cnt) AS patient_cnt,
+        SUM(m.total_cost)  AS total_cost,
+        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
+      FROM disease_year_age_sex_metrics m
+      LEFT JOIN disease d
+        ON m.disease_code = d.disease_code
+      WHERE m.year = ?
+        AND m.age_group = ?
+        AND m.sex = ?
+      GROUP BY m.disease_code, COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code)
+    )
+    SELECT * FROM agg
+    ORDER BY {order_by}
     LIMIT ?;
     """
+
     rows = d1_query(sql, [year, age_group, sex, int(limit)])
 
     cards: list[dict] = []
     for r in rows:
-        name = (r.get("disease_name_ko") or "").strip() or "질병"
+        name = (r.get("disease_name_ko") or r.get("disease_code") or "").strip() or "질병"
         patient_cnt = int(r.get("patient_cnt") or 0)
         total_cost = float(r.get("total_cost") or 0)
         cpp = float(r.get("cost_per_patient") or 0)
 
+        # 기준이 선택되었으니, 카드 value에서 "기준 지표를 앞에" 노출
+        if sort_key == "total_cost":
+            lead = f"연간 진료비 {format_krw_compact(total_cost)}"
+        elif sort_key == "patient_cnt":
+            lead = f"환자 {patient_cnt:,}명"
+        else:
+            lead = f"1인당 {format_krw_compact(cpp)}"
+
         cards.append(
             {
                 "title": name,
-                "value": f"연간 진료비 {format_krw_compact(total_cost)} · 환자 {patient_cnt:,}명 · 1인당 {format_krw_compact(cpp)}",
+                "value": f"{lead} · 진료비 {format_krw_compact(total_cost)} · 환자 {patient_cnt:,}명 · 1인당 {format_krw_compact(cpp)}",
             }
         )
     return cards
@@ -345,10 +383,6 @@ def chromium_pdf_bytes(html: str) -> bytes:
 # =========================================================
 st.set_page_config(page_title="보장 점검 유인 팜플렛", layout="centered")
 
-# # 디버그 표시(원하면 나중에 지워도 됨)
-# st.caption(f"PLAYWRIGHT_BROWSERS_PATH={os.environ.get('PLAYWRIGHT_BROWSERS_PATH')}")
-# st.caption(f"exists? {Path(os.environ['PLAYWRIGHT_BROWSERS_PATH']).exists()}")
-
 token = st.query_params.get("token")
 if not token:
     st.error("유효한 접속 정보가 없습니다. M.POST 게이트웨이 링크로 접속해 주세요.")
@@ -383,9 +417,20 @@ if not segment:
     st.stop()
 
 # ---------------------------------------------------------
+# 통계 옵션(Top7 기준 선택)
+# ---------------------------------------------------------
+st.subheader("통계 표시 옵션")
+sort_label = st.radio(
+    "Top7 기준",
+    options=list(STAT_SORT_OPTIONS.keys()),
+    index=0,
+    horizontal=True,
+)
+sort_key = STAT_SORT_OPTIONS[sort_label]["key"]
+
+# ---------------------------------------------------------
 # D1 기반 통계 카드 구성 (Top7)
 # ---------------------------------------------------------
-# age_band -> DB age_group 매핑은 네 DB에 맞게 여기서 매핑
 AGE_GROUP_MAP = {
     "20대": "20_29",
     "30대": "30_39",
@@ -398,7 +443,7 @@ sex = "M" if gender == "남성" else "F"
 year = int(stats_db.get("base_year", 2024))
 
 try:
-    cards = fetch_top_cards(year, age_group, sex, limit=7)
+    cards = fetch_top_cards(year, age_group, sex, sort_key=sort_key, limit=7)
 except Exception as e:
     st.error(f"D1 통계 조회 실패: {e}")
     cards = []
@@ -451,7 +496,8 @@ context = {
     "stats": {
         "base_year": str(year),
         "source": stats_db.get("source", "공식 보건의료 통계(요약)"),
-        "cards": cards,  # ✅ D1 Top7 카드 반영
+        "cards": cards,
+        "top7_basis": sort_label,  # 템플릿에 표기하고 싶으면 사용
     },
     "structure_rows": structure_rows,
     "footer": stats_db.get(
