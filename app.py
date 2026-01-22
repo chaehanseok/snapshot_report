@@ -1063,7 +1063,7 @@ emerging_rows = pick_emerging_rows(top_rows, after_rows, limit=5)
 
 if emerging_rows:
     st.markdown("#### 향후 새롭게 부각되는 질병 (현재 Top10에 없음)")
-    with st.expander("신규 부각 질병 상세"):
+    with st.expander("신규 부각 질병 상세", expanded=True):
         st.dataframe(
             [
                 {
