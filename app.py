@@ -725,9 +725,19 @@ st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
 st.divider()
 
-customer_name = st.text_input("고객 성명", value="")
-gender = st.selectbox("성별", ["남성", "여성"])
-age_band = st.selectbox("연령대", ["20대", "30대", "40대", "50대", "60대 이상"])
+st.subheader("고객 기본 정보")
+
+col1, col2, col3 = st.columns([2, 1, 1])
+
+with col1:
+    customer_name = st.text_input("고객 성명", value="")
+
+with col2:
+    gender = st.selectbox("성별", ["남성", "여성"])
+
+with col3:
+    age_band = st.selectbox("연령대", ["20대", "30대", "40대", "50대", "60대 이상"])
+
 
 key = segment_key(age_band, gender)
 segment = segments_db["segments"].get(key)
