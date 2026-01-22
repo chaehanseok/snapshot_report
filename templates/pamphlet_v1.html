@@ -53,9 +53,9 @@
 
         {% if stats.chart_data_uri %}
           <div class="chart-box">
-            <img class="stats-chart" src="{{ stats.chart_data_uri }}" alt="Top7 통계 차트" />
+            <img class="stats-chart" src="{{ stats.chart_data_uri }}" alt="Top10 통계 차트" />
             <div class="note">
-              * 기준: {{ stats.base_year }} · {{ stats.source }} · Top7 기준: {{ stats.top7_basis }}
+              * 기준: {{ stats.base_year }} · {{ stats.source }} · Top10 기준: {{ stats.top7_basis }}
             </div>
           </div>
         {% else %}

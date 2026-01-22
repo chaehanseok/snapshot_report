@@ -654,13 +654,18 @@ def fetch_top_rows_after_age(
     placeholders = ",".join(["?"] * len(after_age_groups))
 
     # ---- HAVING 동적 구성 (여기서 네가 말한 코드 조각이 들어갈 자리) ----
+    years = int(end_year) - int(start_year) + 1
+
     having_sql = "HAVING 1=1\n"
     params = [int(start_year), int(end_year), sex, *after_age_groups]
 
+    # ✅ 최소 환자수: 연평균 기준으로 필터링
     if min_patient_cnt is not None and int(min_patient_cnt) > 0:
-        having_sql += "  AND SUM(m.patient_cnt) >= ?\n"
+        having_sql += "  AND (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(?, 0)) >= ?\n"
+        params.append(int(years))
         params.append(int(min_patient_cnt))
 
+    # ✅ 최소 1인당 진료비(천원): 원래대로 (기간평균 개념)
     if min_cpp_chewon is not None and int(min_cpp_chewon) > 0:
         having_sql += "  AND (CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
         params.append(int(min_cpp_chewon))
