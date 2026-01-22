@@ -230,163 +230,226 @@ def build_top7_combo_chart_data_uri(
     rows: list[dict],
     title: str,
     basis: str,
+    start_year: int | None = None,
+    end_year: int | None = None,
 ) -> str:
     """
-    rows (단위)
-      - patient_cnt      : 연평균 환자수(명)
-      - total_cost       : 연평균 총진료비(천원)
-      - cost_per_patient : 기간평균 1인당 진료비(천원)
+    Top7 콤보 차트 (막대 1 + 보조선 2)
 
-    출력 정책
-      - 막대: basis 1개
-      - 선: basis가 아닌 나머지 2개를 항상 표시 (2개)
-      - 보조축은 존재하되 숫자/라벨/눈금은 숨김 (차트에 '표처럼' 값만 붙여 보여줌)
-      - 값 텍스트: 메인 1번 + (보조 2개)만 표시 (중복 금지)
-      - 선 색: 미래에셋 블루/오렌지 2개만 사용
+    입력 rows: fetch_top_rows() 결과 (집계값)
+      - disease_code
+      - disease_name_ko
+      - patient_cnt      (기간합, 명)
+      - total_cost       (기간합, 천원)
+      - cost_per_patient (기간평균, 천원)
+
+    표기/정책
+      - 총진료비, 환자수: "연평균"으로 변환해서 표시 (기간합 ÷ years)
+      - 1인당 진료비: 기간평균 그대로 표시
+      - 단위:
+          * 총진료비: 억원
+          * 1인당 진료비: 만원
+          * 환자수: 명
+      - 막대 = basis(선택 기준) 1개
+      - 보조선 = 나머지 2개 (항상 2개 유지, 중복이면 해당 선은 숨김)
+      - Y축: 질병명(코드)
+      - 보조축:
+          * 보조선1(총진료비): 위쪽(top)
+          * 보조선2(1인당): 아래쪽(bottom)  (중복 테두리/가로선 제거)
+      - 메인 막대 축: 라벨/눈금 숫자 숨김 (값 라벨로 충분)
+      - 범례: 보조선만 표시(2개 또는 1개)
+      - 색:
+          * 미래에셋 블루: #003A70
+          * 오렌지:        #F58220
     """
     if not rows:
         return ""
 
-    # 폰트 (앱이 죽지 않게 하는 안전 버전)
-    configure_matplotlib_korean_font()
+    # --- font (절대 안 죽게) ---
+    try:
+        configure_matplotlib_korean_font()
+    except Exception:
+        pass
+
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import FuncFormatter
+    from io import BytesIO
+    import base64
 
     MIRAE_BLUE = "#003A70"
     MIRAE_ORANGE = "#F58220"
 
-    # ===== unit conversion (원 데이터: 천원) =====
-    def cost_eok_from_chewon(x: float) -> float:
-        return float(x or 0) / 100000.0  # 천원 -> 억원
+    # --- years for annualization ---
+    if start_year is None or end_year is None:
+        years = 1
+    else:
+        years = max(1, int(end_year) - int(start_year) + 1)
 
-    def cpp_man_from_chewon(x: float) -> float:
-        return float(x or 0) / 10.0      # 천원 -> 만원
+    # --- unit conversions (원 데이터: total_cost/cpp = 천원) ---
+    def to_eok_from_chewon(x: float) -> float:
+        # 1억 원 = 100,000천원
+        return float(x or 0) / 100000.0
 
-    labels, patient_avg, cost_avg_eok, cpp_man = [], [], [], []
+    def to_man_from_chewon(x: float) -> float:
+        # 1만 원 = 10천원
+        return float(x or 0) / 10.0
+
+    # --- build series (연평균 적용) ---
+    labels: list[str] = []
+    patient_avg: list[float] = []   # 연평균 환자수(명)
+    cost_avg_eok: list[float] = []  # 연평균 총진료비(억원)
+    cpp_man: list[float] = []       # 1인당(만원) (기간평균)
+
     for r in rows:
         code = (r.get("disease_code") or "").strip()
         name = (r.get("disease_name_ko") or "").strip() or code or "질병"
         labels.append(f"{name} ({code})" if code else name)
 
-        patient_avg.append(float(r.get("patient_cnt") or 0))
-        cost_avg_eok.append(cost_eok_from_chewon(float(r.get("total_cost") or 0)))
-        cpp_man.append(cpp_man_from_chewon(float(r.get("cost_per_patient") or 0)))
+        p_sum = float(r.get("patient_cnt") or 0)
+        c_sum_chewon = float(r.get("total_cost") or 0)
+        cpp_chewon = float(r.get("cost_per_patient") or 0)
 
-    # Top1이 위로
+        patient_avg.append(p_sum / years)
+        cost_avg_eok.append(to_eok_from_chewon(c_sum_chewon / years))
+        cpp_man.append(to_man_from_chewon(cpp_chewon))
+
+    # Top1이 위로 오게
     labels = labels[::-1]
     patient_avg = patient_avg[::-1]
     cost_avg_eok = cost_avg_eok[::-1]
     cpp_man = cpp_man[::-1]
-
     y = list(range(len(labels)))
 
-    # ===== choose bar (main) =====
-    if basis == "total_cost":
-        bar_vals = cost_avg_eok
-        bar_unit = "억"
-        main_name = "총 진료비(연평균)"
-        main_fmt = lambda v: f"{v:.1f}억"
-        # aux 2개: 환자수 + 1인당
-        aux_specs = [
-            ("환자수(연평균)", patient_avg, "명", lambda v: f"{int(v):,}명"),
-            ("1인당 진료비(기간평균)", cpp_man, "만", lambda v: f"{v:.1f}만"),
-        ]
-    elif basis == "patient_cnt":
+    # --- choose bar by basis ---
+    if basis == "patient_cnt":
         bar_vals = patient_avg
-        bar_unit = "명"
         main_name = "환자수(연평균)"
-        main_fmt = lambda v: f"{int(v):,}명"
-        # aux 2개: 총진료비 + 1인당
-        aux_specs = [
-            ("총 진료비(연평균)", cost_avg_eok, "억", lambda v: f"{v:.1f}억"),
-            ("1인당 진료비(기간평균)", cpp_man, "만", lambda v: f"{v:.1f}만"),
-        ]
+        main_unit = "명"
+        # aux: cost + cpp
+        aux1 = ("연평균 총 진료비", cost_avg_eok, "억", MIRAE_ORANGE, "top")
+        aux2 = ("1인당 진료비", cpp_man, "만", MIRAE_BLUE, "bottom")
+    elif basis == "total_cost":
+        bar_vals = cost_avg_eok
+        main_name = "총 진료비(연평균)"
+        main_unit = "억"
+        # aux: patient + cpp
+        aux1 = ("환자수(연평균)", patient_avg, "명", MIRAE_ORANGE, "top")
+        aux2 = ("1인당 진료비", cpp_man, "만", MIRAE_BLUE, "bottom")
     else:  # cost_per_patient
         bar_vals = cpp_man
-        bar_unit = "만"
         main_name = "1인당 진료비(기간평균)"
-        main_fmt = lambda v: f"{v:.1f}만"
-        # aux 2개: 환자수 + 총진료비
-        aux_specs = [
-            ("환자수(연평균)", patient_avg, "명", lambda v: f"{int(v):,}명"),
-            ("총 진료비(연평균)", cost_avg_eok, "억", lambda v: f"{v:.1f}억"),
-        ]
+        main_unit = "만"
+        # aux: patient + cost
+        aux1 = ("환자수(연평균)", patient_avg, "명", MIRAE_ORANGE, "top")
+        aux2 = ("연평균 총 진료비", cost_avg_eok, "억", MIRAE_BLUE, "bottom")
 
-    import matplotlib.pyplot as plt
-    from io import BytesIO
-    import base64
-
+    # --- plot ---
     plt.close("all")
     fig, ax = plt.subplots(figsize=(12.5, 5.2), dpi=200)
 
-    # ===== bar =====
+    # bar
     ax.barh(y, bar_vals)
     ax.set_yticks(y)
     ax.set_yticklabels(labels)
 
-    # 메인축(아래) 숫자/라벨 제거
+    # 메인축(막대축) 라벨/눈금 숨김
     ax.set_xlabel("")
     ax.tick_params(axis="x", bottom=False, labelbottom=False)
     ax.grid(axis="x", linestyle="--", alpha=0.25)
 
-    # 바 영역 여유
-    max_bar = max(bar_vals) if max(bar_vals) > 0 else 1
-    ax.set_xlim(0, max_bar * 1.20)
+    # ✅ 중복 가로선 제거(위쪽 테두리)
+    ax.spines["top"].set_visible(False)
 
-    # ===== two auxiliary axes (hidden ticks) =====
-    # 두 선을 서로 다른 스케일로 그려야 하니 축은 필요하지만, "보이지 않게" 처리한다.
-    ax_aux1 = ax.twiny()
-    ax_aux2 = ax.twiny()
+    # --- helper formatter ---
+    def fmt_with_unit(unit: str):
+        if unit == "명":
+            return FuncFormatter(lambda v, p: f"{int(v):,}")
+        # 억/만은 소수 0자리(필요하면 1자리로 변경 가능)
+        return FuncFormatter(lambda v, p: f"{v:.0f}")
 
-    # 위/아래 위치만 구분(숫자/라벨은 전부 숨김)
-    ax_aux1.spines["top"].set_position(("axes", 1.02))
-    ax_aux2.spines["bottom"].set_position(("axes", -0.10))
-    ax_aux2.xaxis.set_ticks_position("bottom")
-    ax_aux2.xaxis.set_label_position("bottom")
+    # --- aux axes (top/bottom) ---
+    ax_top = ax.twiny()
+    ax_bottom = ax.twiny()
 
-    for a in (ax_aux1, ax_aux2):
-        a.set_xlabel("")
-        a.tick_params(axis="x", top=False, bottom=False, labeltop=False, labelbottom=False)
-        a.grid(False)
+    # positions
+    ax_top.spines["top"].set_position(("axes", 1.02))
+    ax_bottom.spines["bottom"].set_position(("axes", -0.10))
+    ax_bottom.xaxis.set_ticks_position("bottom")
+    ax_bottom.xaxis.set_label_position("bottom")
 
-    # ===== line colors: 2개만 사용 =====
-    # 첫 번째 보조선 = 오렌지, 두 번째 = 블루 (항상 동일)
-    (aux1_label, aux1_vals, _, _), (aux2_label, aux2_vals, _, _) = aux_specs
+    # ✅ 보조축 스파인 정리 (쓸데없는 테두리 제거)
+    for a in (ax_top, ax_bottom):
+        a.spines["left"].set_visible(False)
+        a.spines["right"].set_visible(False)
+    ax_top.spines["bottom"].set_visible(False)
+    ax_bottom.spines["top"].set_visible(False)
 
-    # 축 범위 설정 (0~max*여유)
-    ax_aux1.set_xlim(0, (max(aux1_vals) * 1.25) if max(aux1_vals) > 0 else 1)
-    ax_aux2.set_xlim(0, (max(aux2_vals) * 1.25) if max(aux2_vals) > 0 else 1)
+    # unpack aux definitions
+    aux_top = aux1 if aux1[4] == "top" else aux2
+    aux_bot = aux2 if aux2[4] == "bottom" else aux1
 
-    h1, = ax_aux1.plot(aux1_vals, y, marker="o", linewidth=2.4, color=MIRAE_ORANGE, label=aux1_label)
-    h2, = ax_aux2.plot(aux2_vals, y, marker="o", linewidth=2.4, color=MIRAE_BLUE,   label=aux2_label)
+    top_label, top_vals, top_unit, top_color, _ = aux_top
+    bot_label, bot_vals, bot_unit, bot_color, _ = aux_bot
 
-    # ===== per-row annotation (main 1회 + aux 2개만) =====
+    # axis limits (pad)
+    ax_top.set_xlim(0, (max(top_vals) * 1.25) if max(top_vals) > 0 else 1)
+    ax_bottom.set_xlim(0, (max(bot_vals) * 1.25) if max(bot_vals) > 0 else 1)
+
+    # axis labels + ticks (✅ 숫자 표시)
+    ax_top.set_xlabel(f"{top_label}({top_unit})")
+    ax_bottom.set_xlabel(f"{bot_label}({bot_unit})")
+    ax_top.xaxis.set_major_formatter(fmt_with_unit(top_unit))
+    ax_bottom.xaxis.set_major_formatter(fmt_with_unit(bot_unit))
+    ax_top.tick_params(axis="x", top=True, labeltop=True, direction="out", pad=2)
+    ax_bottom.tick_params(axis="x", bottom=True, labelbottom=True, direction="out", pad=2)
+
+    # lines
+    h_top, = ax_top.plot(top_vals, y, marker="o", linewidth=2.4, color=top_color, label=f"{top_label}({top_unit})")
+    h_bot, = ax_bottom.plot(bot_vals, y, marker="o", linewidth=2.4, color=bot_color, label=f"{bot_label}({bot_unit})")
+
+    # bar range for text layout
+    ax.set_xlim(0, (max(bar_vals) * 1.12) if max(bar_vals) > 0 else 1)
+
+    # --- per-row annotation: "메인 1회만" + (보조 2개) ---
     for i in range(len(labels)):
-        main_txt = main_fmt(bar_vals[i])
+        if main_unit == "명":
+            main_txt = f"{int(bar_vals[i]):,}명"
+        else:
+            main_txt = f"{bar_vals[i]:.1f}{main_unit}"
 
-        # aux 텍스트
-        _, _, _, aux1_fmt = aux_specs[0]
-        _, _, _, aux2_fmt = aux_specs[1]
-        aux_txt = f"{aux1_fmt(aux1_vals[i])} · {aux2_fmt(aux2_vals[i])}"
+        # 보조는 항상 2개 (top/bottom)
+        if top_unit == "명":
+            top_txt = f"{int(top_vals[i]):,}명"
+        else:
+            top_txt = f"{top_vals[i]:.1f}{top_unit}"
+
+        if bot_unit == "명":
+            bot_txt = f"{int(bot_vals[i]):,}명"
+        else:
+            bot_txt = f"{bot_vals[i]:.1f}{bot_unit}"
 
         ax.text(
             bar_vals[i],
             i,
-            f"  {main_txt} ({aux_txt})",
+            f"  {main_txt} ({top_txt} · {bot_txt})",
             va="center",
             fontsize=9,
         )
 
-    # ===== title / legend =====
+    # title (✅ 메인 문구는 빼고 기준만)
     fig.suptitle(title, fontsize=14, fontweight="bold")
-    ax.legend(handles=[h1, h2], loc="lower right", frameon=True)
+
+    # legend (보조 2개)
+    ax.legend(handles=[h_top, h_bot], loc="lower right", frameon=True)
 
     fig.tight_layout(rect=[0, 0, 1, 0.95])
 
     buf = BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
     plt.close(fig)
-
     png_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{png_b64}"
+
 
 
 STAT_SORT_OPTIONS = {
@@ -722,8 +785,9 @@ chart_data_uri = build_top7_combo_chart_data_uri(
     top_rows,
     title=chart_title,
     basis=sort_key,
+    start_year=int(start_year),
+    end_year=int(end_year),
 )
-
 st.markdown("#### 통계 미리보기 (차트)")
 
 if chart_data_uri:
