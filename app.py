@@ -535,6 +535,51 @@ def fetch_top_rows(
     return rows
 
 
+AFTER_AGE_GROUPS = {
+    "20대": ["30_39", "40_49", "50_59", "60_69", "70_79", "80_plus"],
+    "30대": ["40_49", "50_59", "60_69", "70_79", "80_plus"],
+    "40대": ["50_59", "60_69", "70_79", "80_plus"],
+    "50대": ["60_69", "70_79", "80_plus"],
+    "60대": ["70_79", "80_plus"],
+    "70대": ["80_plus"],
+}
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def fetch_top_rows_after_age(
+    start_year: int,
+    end_year: int,
+    age_groups: list[str],
+    sex: str,
+    sort_key: str,
+    limit: int = 10,
+) -> list[dict]:
+
+    placeholders = ",".join(["?"] * len(age_groups))
+
+    sql = f"""
+    WITH agg AS (
+      SELECT
+        m.disease_code,
+        COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
+        SUM(m.patient_cnt) AS patient_cnt,
+        SUM(m.total_cost) AS total_cost,
+        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
+      FROM disease_year_age_sex_metrics m
+      LEFT JOIN disease d ON m.disease_code = d.disease_code
+      WHERE m.year BETWEEN ? AND ?
+        AND m.age_group IN ({placeholders})
+        AND m.sex = ?
+      GROUP BY m.disease_code, disease_name_ko
+    )
+    SELECT * FROM agg
+    ORDER BY {sort_key} DESC
+    LIMIT ?;
+    """
+
+    params = [start_year, end_year, *age_groups, sex, limit]
+    return d1_query(sql, params)
+
+
 # =========================================================
 # Utilities (rendering)
 # =========================================================
@@ -667,6 +712,12 @@ def build_top_table_df(rows: list[dict]) -> "pd.DataFrame":
         })
 
     return pd.DataFrame(data)
+
+def fmt_int(n: int | float) -> str:
+    return f"{int(n):,}"
+
+def fmt_float1(n: float) -> str:
+    return f"{n:,.1f}"
 
 # =========================================================
 # PDF generation (Chromium via Playwright)
@@ -897,7 +948,8 @@ chart_data_uri = build_top7_combo_chart_data_uri(
     start_year=int(start_year),
     end_year=int(end_year),
 )
-st.markdown("#### 통계 미리보기 (차트)")
+
+st.markdown("### 현재 연령대 통계")
 
 if chart_data_uri:
     b64 = chart_data_uri.split(",", 1)[1]
@@ -920,15 +972,45 @@ with st.expander("통계 상세 (Top10 테이블)"):
             {
                 "질병코드": r.get("disease_code"),
                 "질병명": r.get("disease_name_ko") or r.get("disease_code"),
-                "총진료비(연평균, 억원)": krw_to_eok(r.get("total_cost")),
-                "환자수(연평균, 명)": int(r.get("patient_cnt") or 0),
-                "1인당 진료비(기간평균, 만원)": krw_to_man(r.get("cost_per_patient")),
+                "총진료비(억원)": fmt_float1(krw_to_eok(r.get("total_cost"))),
+                "환자수(명)": fmt_int(r.get("patient_cnt") or 0),
+                "1인당 진료비(만원)": fmt_float1(krw_to_man(r.get("cost_per_patient"))),
             }
             for r in top_rows
         ],
         use_container_width=True,
         hide_index=True,
     )
+
+# ---- 이후 연령대 ----
+after_groups = AFTER_AGE_GROUPS.get(age_band, [])
+
+if not after_groups:
+    st.info("선택한 연령대 이후의 통계가 존재하지 않습니다.")
+
+if after_groups:
+    after_rows = fetch_top_rows_after_age(
+        start_year,
+        end_year,
+        after_groups,
+        sex,
+        sort_key,
+        limit=10,
+    )
+
+    after_title = (
+        f"이후 연령대 합산 통계 "
+        f"({age_band} 이후 · {sex_display} · 기준: {sort_label})"
+    )
+
+    after_chart_uri = build_top7_combo_chart_data_uri(
+        after_rows,
+        title=after_title,
+        basis=sort_key,
+    )
+
+    st.markdown("### 이후 연령대(미래 위험) 통계")
+    st.image(base64.b64decode(after_chart_uri.split(",")[1]))
 
 
 st.subheader("문구 조정(선택/제한)")
