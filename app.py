@@ -461,7 +461,7 @@ def build_top7_combo_chart_data_uri(
 
 STAT_SORT_OPTIONS = {
     "총 진료비(연평균)": {"key": "total_cost"},
-    "환자수(연평균)": {"key": "patient_cnt"},
+    "유병률(10만명당)": {"key": "patient_cnt"},          # ✅ 내부키는 유지해도 되지만 의미는 유병률
     "1인당 진료비(기간평균)": {"key": "cost_per_patient"},
 }
 
@@ -483,32 +483,33 @@ def fetch_top_rows(
     sex: str,
     sort_key: str = "total_cost",
     limit: int = 10,
-    min_patient_cnt: int | None = None,   # 연평균 '명'
-    min_cpp_chewon: int | None = None,    # '천원' (1인당)
+    min_prev_100k: float | None = None,   # ✅ 유병률(10만명당)
+    min_cpp_chewon: int | None = None,    # ✅ 1인당(천원)
 ) -> list[dict]:
+
     if sort_key not in ("total_cost", "patient_cnt", "cost_per_patient"):
         sort_key = "total_cost"
 
+    # ✅ patient_cnt 키는 '유병률'로 정렬
     order_by = {
         "total_cost": "total_cost DESC",
-        "patient_cnt": "patient_cnt DESC",
+        "patient_cnt": "prevalence_per_100k DESC",
         "cost_per_patient": "cost_per_patient DESC",
     }[sort_key]
-
-    years = max(1, int(end_year) - int(start_year) + 1)
 
     having_sql = "HAVING 1=1\n"
     params = [int(start_year), int(end_year), age_group, sex]
 
-    # ✅ 최소 환자수: 연평균 기준으로 필터
-    if min_patient_cnt is not None and int(min_patient_cnt) > 0:
-        having_sql += "  AND (CAST(SUM(m.patient_cnt) AS REAL) / ?) >= ?\n"
-        params.append(int(years))
-        params.append(int(min_patient_cnt))
+    if min_prev_100k is not None and float(min_prev_100k) > 0:
+        having_sql += (
+            "  AND (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(SUM(m.population), 0)) * 100000.0 >= ?\n"
+        )
+        params.append(float(min_prev_100k))
 
-    # ✅ 최소 1인당(천원): SUM(total_cost)/SUM(patient_cnt)
     if min_cpp_chewon is not None and int(min_cpp_chewon) > 0:
-        having_sql += "  AND (CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
+        having_sql += (
+            "  AND (CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
+        )
         params.append(int(min_cpp_chewon))
 
     params.append(int(limit))
@@ -518,9 +519,13 @@ def fetch_top_rows(
       SELECT
         m.disease_code AS disease_code,
         COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
-        SUM(m.patient_cnt) AS patient_cnt,           -- 기간합
-        SUM(m.total_cost)  AS total_cost,            -- 기간합(천원)
-        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
+
+        SUM(m.patient_cnt) AS patient_cnt,        -- 기간합(명)
+        SUM(m.total_cost)  AS total_cost,         -- 기간합(천원)
+        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient,  -- 천원
+
+        SUM(m.population) AS population,          -- 기간합(명)
+        (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(SUM(m.population), 0)) * 100000.0 AS prevalence_per_100k
       FROM disease_year_age_sex_metrics m
       LEFT JOIN disease d
         ON m.disease_code = d.disease_code
@@ -534,6 +539,7 @@ def fetch_top_rows(
     ORDER BY {order_by}
     LIMIT ?;
     """
+
     return d1_query(sql, params)
 
 
@@ -545,9 +551,10 @@ def fetch_top_rows_after_age(
     sex: str,
     sort_key: str = "total_cost",
     limit: int = 10,
-    min_patient_cnt: int | None = None,   # 연평균 '명'
-    min_cpp_chewon: int | None = None,    # '천원'
+    min_prev_100k: float | None = None,
+    min_cpp_chewon: int | None = None,
 ) -> list[dict]:
+
     if not after_age_groups:
         return []
 
@@ -556,25 +563,25 @@ def fetch_top_rows_after_age(
 
     order_by = {
         "total_cost": "total_cost DESC",
-        "patient_cnt": "patient_cnt DESC",
+        "patient_cnt": "prevalence_per_100k DESC",
         "cost_per_patient": "cost_per_patient DESC",
     }[sort_key]
 
-    years = max(1, int(end_year) - int(start_year) + 1)
     placeholders = ",".join(["?"] * len(after_age_groups))
 
     having_sql = "HAVING 1=1\n"
     params = [int(start_year), int(end_year), sex, *after_age_groups]
 
-    # ✅ 최소 환자수: 연평균 기준
-    if min_patient_cnt is not None and int(min_patient_cnt) > 0:
-        having_sql += "  AND (CAST(SUM(m.patient_cnt) AS REAL) / ?) >= ?\n"
-        params.append(int(years))
-        params.append(int(min_patient_cnt))
+    if min_prev_100k is not None and float(min_prev_100k) > 0:
+        having_sql += (
+            "  AND (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(SUM(m.population), 0)) * 100000.0 >= ?\n"
+        )
+        params.append(float(min_prev_100k))
 
-    # ✅ 최소 1인당(천원)
     if min_cpp_chewon is not None and int(min_cpp_chewon) > 0:
-        having_sql += "  AND (CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
+        having_sql += (
+            "  AND (CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0)) >= ?\n"
+        )
         params.append(int(min_cpp_chewon))
 
     params.append(int(limit))
@@ -584,9 +591,13 @@ def fetch_top_rows_after_age(
       SELECT
         m.disease_code AS disease_code,
         COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code) AS disease_name_ko,
-        SUM(m.patient_cnt) AS patient_cnt,          -- 기간합
-        SUM(m.total_cost)  AS total_cost,           -- 기간합(천원)
-        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
+
+        SUM(m.patient_cnt) AS patient_cnt,
+        SUM(m.total_cost)  AS total_cost,
+        CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient,
+
+        SUM(m.population) AS population,
+        (CAST(SUM(m.patient_cnt) AS REAL) / NULLIF(SUM(m.population), 0)) * 100000.0 AS prevalence_per_100k
       FROM disease_year_age_sex_metrics m
       LEFT JOIN disease d
         ON m.disease_code = d.disease_code
@@ -600,7 +611,9 @@ def fetch_top_rows_after_age(
     ORDER BY {order_by}
     LIMIT ?;
     """
+
     return d1_query(sql, params)
+
 
 def pick_emerging_rows(now_rows: list[dict], after_rows: list[dict], limit: int = 5) -> list[dict]:
     now_codes = { (r.get("disease_code") or "").strip() for r in (now_rows or []) }
@@ -875,31 +888,29 @@ sort_key = STAT_SORT_OPTIONS[sort_label]["key"]
 
 # ✅ 기준에 따라 추가 옵션(슬라이더) 노출
 # - 기본값: 환자수 100명, 1인당 100만원
-min_patient_cnt = None
-min_cpp_chewon = None  # 천원 단위로 넘김 (100만원=1,000천원)
+min_prev_100k = None
+min_cpp_chewon = None
 
 # 슬라이더 편의: 1인당 진료비(만원)로 입력 받고 -> 천원으로 변환
 def manwon_to_chewon(m: int) -> int:
     # 만원 -> 원: *10,000, 천원: /1,000 => 만원*10
     return int(m) * 10
 
-st.caption("조건 필터(선택): 기준이 총진료비/환자수/1인당 중 무엇이냐에 따라 입력 옵션이 달라집니다.")
+st.caption("조건 필터(선택): 기준이 총진료비/유병율(10만명당)/1인당 중 무엇이냐에 따라 입력 옵션이 달라집니다.")
 
 if sort_key == "total_cost":
     c1, c2 = st.columns(2)
     with c1:
-        min_patient_cnt = st.slider("최소 환자수(명)", min_value=0, max_value=5000, value=100, step=10)
+        min_prev_100k = st.slider("최소 유병률(10만명당)", 0.0, 2000.0, 50.0, 5.0)
     with c2:
-        min_cpp_manwon = st.slider("최소 1인당 진료비(만원)", min_value=0, max_value=5000, value=100, step=10)
+        min_cpp_manwon = st.slider("최소 1인당 진료비(만원)", 0, 5000, 100, 10)
         min_cpp_chewon = manwon_to_chewon(min_cpp_manwon)
 
-elif sort_key == "patient_cnt":
-    min_cpp_manwon = st.slider("최소 1인당 진료비(만원)", min_value=0, max_value=5000, value=100, step=10)
-    min_cpp_chewon = manwon_to_chewon(min_cpp_manwon)
+elif sort_key == "patient_cnt":  # ✅ 의미상 유병률
+    min_prev_100k = st.slider("최소 유병률(10만명당)", 0.0, 2000.0, 50.0, 5.0)
 
 else:  # cost_per_patient
-    min_patient_cnt = st.slider("최소 환자수(명)", min_value=0, max_value=5000, value=100, step=10)
-
+    min_prev_100k = st.slider("최소 유병률(10만명당)", 0.0, 2000.0, 50.0, 5.0)
 
 # =========================================================
 # D1 기반 통계 미리보기 (현재 연령대 + 이후 연령대 합산)
@@ -918,12 +929,25 @@ age_group = AGE_GROUP_MAP.get(age_band, "50_59")
 sex = "M" if gender == "남성" else "F"
 sex_display = "남성" if sex == "M" else "여성"
 
+# ✅ 표 숫자 포맷: 콤마 + 소수 1자리
+def chewon_to_eok(x: float | int) -> float:
+    return float(x or 0) / 100000.0  # 천원 -> 억원
+
+def chewon_to_man(x: float | int) -> float:
+    return float(x or 0) / 10.0      # 천원 -> 만원
+
+def annualize_total_cost_eok(total_cost_chewon: float | int) -> float:
+    # 기간합(천원) -> 연평균(천원) -> 억원
+    return chewon_to_eok((float(total_cost_chewon or 0) / years))
+
+def annualize_patient_cnt(patient_cnt_sum: float | int) -> float:
+    # 기간합(명) -> 연평균(명)
+    return float(patient_cnt_sum or 0) / years
+
+
 st.markdown("#### 고객 연령대 통계 (현재)")
 
 try:
-    # ✅ 기존 fetch_top_rows가 아직 '기간합'을 반환하면,
-    #    SQL 내부에서 연평균으로 나누는 버전으로 이미 바꿔놓는 것을 권장.
-    #    (현재 코드에서는 build_top7_combo_chart_data_uri가 '연평균'으로 가정하고 있음)
     top_rows = fetch_top_rows(
         start_year,
         end_year,
@@ -931,11 +955,10 @@ try:
         sex,
         sort_key=sort_key,
         limit=10,
-        min_patient_cnt=min_patient_cnt,
+        min_prev_100k=min_prev_100k,
         min_cpp_chewon=min_cpp_chewon,
     )
 except TypeError:
-    # ✅ 너의 fetch_top_rows에 min_* 인자가 아직 없을 수 있으니 fallback
     top_rows = fetch_top_rows(
         start_year,
         end_year,
@@ -953,10 +976,13 @@ chart_title = (
     f"({start_year}~{end_year} · {age_band} · {sex_display} · 기준: {sort_label})"
 )
 
+# ✅ 차트 함수에 start_year/end_year 전달 (연평균 계산 일관성)
 chart_data_uri = build_top7_combo_chart_data_uri(
     top_rows,
     title=chart_title,
     basis=sort_key,
+    start_year=int(start_year),
+    end_year=int(end_year),
 )
 
 if chart_data_uri:
@@ -965,24 +991,14 @@ if chart_data_uri:
 else:
     st.warning("차트를 만들 데이터가 없습니다. 조건을 바꿔보세요.")
 
-
-# ✅ 표 숫자 포맷: 콤마 + 소수 1자리
-def chewon_to_eok(x: float | int) -> float:
-    # 천원 -> 억원 (천원/100000 = 억원)
-    return float(x or 0) / 100000.0
-
-def chewon_to_man(x: float | int) -> float:
-    # 천원 -> 만원 (천원/10 = 만원)
-    return float(x or 0) / 10.0
-
 with st.expander("통계 상세 (Top10 테이블) - 현재 연령대"):
     st.dataframe(
         [
             {
                 "질병코드": r.get("disease_code"),
                 "질병명": r.get("disease_name_ko") or r.get("disease_code"),
-                "총진료비(연평균, 억원)": f"{chewon_to_eok(r.get('total_cost')):,.1f}",
-                "환자수(연평균, 명)": f"{float(r.get('patient_cnt') or 0):,.0f}",
+                "총진료비(연평균, 억원)": f"{annualize_total_cost_eok(r.get('total_cost')):,.1f}",
+                "환자수(연평균, 명)": f"{annualize_patient_cnt(r.get('patient_cnt')):,.0f}",
                 "1인당 진료비(만원)": f"{chewon_to_man(r.get('cost_per_patient')):,.1f}",
             }
             for r in (top_rows or [])
@@ -1011,11 +1027,10 @@ else:
             sex=sex,
             sort_key=sort_key,
             limit=10,
-            min_patient_cnt=min_patient_cnt,
+            min_prev_100k=min_prev_100k,
             min_cpp_chewon=min_cpp_chewon,
         )
     except TypeError:
-        # ✅ 함수 시그니처에 min_* 없을 수 있으니 fallback
         after_rows = fetch_top_rows_after_age(
             start_year,
             end_year,
@@ -1034,19 +1049,19 @@ if after_groups and after_rows:
         after_rows,
         title=after_title,
         basis=sort_key,
+        start_year=int(start_year),
+        end_year=int(end_year),
     )
-
     st.image(base64.b64decode(after_chart_uri.split(",", 1)[1]))
 
-    # ✅ 이후 연령대 합산 Top10 테이블도 추가
     with st.expander("통계 상세 (Top10 테이블) - 이후 연령대 합산"):
         st.dataframe(
             [
                 {
                     "질병코드": r.get("disease_code"),
                     "질병명": r.get("disease_name_ko") or r.get("disease_code"),
-                    "총진료비(연평균, 억원)": f"{chewon_to_eok(r.get('total_cost')):,.1f}",
-                    "환자수(연평균, 명)": f"{float(r.get('patient_cnt') or 0):,.0f}",
+                    "총진료비(연평균, 억원)": f"{annualize_total_cost_eok(r.get('total_cost')):,.1f}",
+                    "유병률(10만명당)": f"{float(r.get('prevalence_per_100k') or 0):,.1f}",
                     "1인당 진료비(만원)": f"{chewon_to_man(r.get('cost_per_patient')):,.1f}",
                 }
                 for r in after_rows
@@ -1059,6 +1074,7 @@ else:
         st.warning("이후 연령대 합산 조건에서 Top10 데이터가 없습니다. 조건을 완화해 보세요.")
 
 
+# ---- 신규 부각 ----
 emerging_rows = pick_emerging_rows(top_rows, after_rows, limit=5)
 
 if emerging_rows:
@@ -1069,8 +1085,9 @@ if emerging_rows:
                 {
                     "질병코드": r.get("disease_code"),
                     "질병명": r.get("disease_name_ko") or r.get("disease_code"),
-                    "총진료비(연평균, 억원)": f"{chewon_to_eok(r.get('total_cost')/years):,.1f}",
-                    "환자수(연평균, 명)": f"{(float(r.get('patient_cnt') or 0)/years):,.0f}",
+                    # ✅ 여기만 /years 하던 것 제거하고, 공통 함수로 통일
+                    "총진료비(연평균, 억원)": f"{annualize_total_cost_eok(r.get('total_cost')):,.1f}",
+                    "환자수(연평균, 명)": f"{annualize_patient_cnt(r.get('patient_cnt')):,.0f}",
                     "1인당 진료비(만원)": f"{chewon_to_man(r.get('cost_per_patient')):,.1f}",
                 }
                 for r in emerging_rows
