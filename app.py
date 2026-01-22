@@ -232,36 +232,23 @@ def build_top7_combo_chart_data_uri(
     basis: str,
     start_year: int,
     end_year: int,
-    *,
-    # 보조선 2개(“2번”) 고정: 막대=메인, 선 2개=보조
-    line1_color: str = "#F58220",  # 미래에셋 오렌지(대략)
-    line2_color: str = "#003A70",  # 미래에셋 네이비(대략)
 ) -> str:
     """
-    Top7 차트 (가독성 강화 버전)
-    - Y축: 질병명 (세로 배열)
-    - 막대: 메인 지표 (basis)
-    - 보조선 2개: 나머지 지표 2개를 각각 별도 축으로 표시
-      - 상단 X축: 보조선#1
-      - 하단 X축(secondary_xaxis): 보조선#2  (메인 막대축 라벨은 제거)
-
-    rows 컬럼:
+    [입력 rows 전제]
       - disease_code
       - disease_name_ko
-      - patient_cnt (명)         : 기간합
-      - total_cost (천원)        : 기간합
-      - cost_per_patient (천원)  : 기간 평균 개념(SUM/ SUM)
+      - patient_cnt        (기간합, 명)  또는 이미 연평균이 들어올 수도 있음
+      - total_cost         (기간합, 천원) 또는 이미 연평균이 들어올 수도 있음
+      - cost_per_patient   (천원)  ※ 보통 기간합/기간평균과 무관하게 ratio로 계산됨
 
-    단위:
-      - 총진료비: '천원' -> '억원'  (1억 = 100,000천원)
-      - 1인당:   '천원' -> '만원'  (1만 = 10천원)
-      - 환자수:  명
-
-    기간 처리:
-      - total_cost, patient_cnt는 '연평균'으로 변환(기간합 / 연수)
-      - cost_per_patient는 그대로(이미 평균 개념)
+    [출력 차트]
+      - 막대: basis(메인 지표)
+      - 선 2개(보조 지표):
+          1) 연평균 총진료비(억원)  (top axis 1)
+          2) 1인당 진료비(만원)      (top axis 2)
+      - 메인 축 tick(숫자) 숨김
+      - 라벨: 메인 값 1번만 + (보조2개)
     """
-    import matplotlib
     import matplotlib.pyplot as plt
     from matplotlib.ticker import FuncFormatter
     from io import BytesIO
@@ -270,196 +257,151 @@ def build_top7_combo_chart_data_uri(
     if not rows:
         return ""
 
-    # -------------------------------------------------
-    # 폰트(한글) 설정: 네 코드에 있는 함수 그대로 사용
-    # -------------------------------------------------
-    # 주의: 이 함수가 addfont에서 에러가 날 수 있으니,
-    # 이미 "폰트 교체로 해결"한 상태라면 정상 동작.
-    configure_matplotlib_korean_font()
-    matplotlib.rcParams["axes.unicode_minus"] = False
+    # ✅ 폰트 설정: 외부에서 이미 configure_matplotlib_korean_font()를 안정화시켰다면
+    # 여기서 다시 호출하지 않아도 됨. 다만 안전하게 한 번만 호출하고 싶으면 아래 주석 해제.
+    # configure_matplotlib_korean_font()
 
-    # -------------------------------------------------
-    # 기간 연수(연평균)
-    # -------------------------------------------------
+    # -----------------------
+    # 기간(연수) 계산 (연평균)
+    # -----------------------
     years = int(end_year) - int(start_year) + 1
-    years = max(years, 1)
+    if years <= 0:
+        years = 1
 
-    # -------------------------------------------------
-    # unit conversions
-    # -------------------------------------------------
-    def to_억원_from_천원(x: float) -> float:
-        return float(x or 0) / 100000.0  # 1억=100,000천원
+    # -----------------------
+    # Unit conversions
+    # -----------------------
+    # 총진료비(천원) -> 억원: 1억 원 = 100,000천원
+    def to_eok_from_cheonwon(x: float) -> float:
+        return float(x or 0) / 100000.0
 
-    def to_만원_from_천원(x: float) -> float:
-        return float(x or 0) / 10.0      # 1만=10천원
+    # 1인당(천원) -> 만원: 1만원 = 10천원
+    def to_man_from_cheonwon(x: float) -> float:
+        return float(x or 0) / 10.0
 
-    # -------------------------------------------------
-    # labels & raw arrays (rows는 DESC 정렬 가정)
-    # -------------------------------------------------
+    # 환자수 그대로(명)
+    def to_person(x: float) -> float:
+        return float(x or 0)
+
+    # -----------------------
+    # Prepare labels/values
+    # -----------------------
     labels = []
-    codes = []
-    total_cost_eok_avg = []  # 연평균 총진료비(억원)
-    patient_cnt_avg = []     # 연평균 환자수(명)
-    cpp_man = []             # 1인당 진료비(만원) (그대로)
+    disease_codes = []
+
+    # 원본(기간합) -> 연평균(차트용)
+    patient_avg = []
+    total_cost_avg_eok = []
+    cpp_man = []
 
     for r in rows:
         code = (r.get("disease_code") or "").strip()
         name = (r.get("disease_name_ko") or "").strip() or code or "질병"
-        codes.append(code)
+
+        disease_codes.append(code)
         labels.append(f"{name} ({code})" if code else name)
 
-        tc = float(r.get("total_cost") or 0)
-        pc = float(r.get("patient_cnt") or 0)
-        cp = float(r.get("cost_per_patient") or 0)
+        # 원본
+        pc_sum = to_person(r.get("patient_cnt") or 0)
+        tc_sum_eok = to_eok_from_cheonwon(r.get("total_cost") or 0)
+        cpp = to_man_from_cheonwon(r.get("cost_per_patient") or 0)
 
-        total_cost_eok_avg.append(to_억원_from_천원(tc / years))
-        patient_cnt_avg.append(pc / years)
-        cpp_man.append(to_만원_from_천원(cp))  # 이미 평균 개념이라 기간 나눔 X
+        # ✅ 연평균 변환
+        # - 만약 SQL에서 이미 연평균을 내려보내는 구조라면 여기서 또 나눠지면 안 됨.
+        # - 지금은 "차트에서 연평균으로 보여주자"가 요구라서, 기본은 /years 적용.
+        # - 만약 SQL을 연평균으로 바꿨다면 rows에 "is_annual=1" 같은 플래그를 넣거나
+        #   아래 annualize=True/False 파라미터로 제어하는 게 가장 깔끔함.
+        pc_avg = pc_sum / years
+        tc_avg_eok = tc_sum_eok / years
+
+        patient_avg.append(pc_avg)
+        total_cost_avg_eok.append(tc_avg_eok)
+        cpp_man.append(cpp)
+
+    # -----------------------
+    # 메인 지표 선택 (막대)
+    # -----------------------
+    # basis: "patient_cnt" | "total_cost" | "cost_per_patient"
+    if basis == "patient_cnt":
+        bar_vals = patient_avg
+        main_label = "환자수(연평균, 명)"
+        main_value_fmt = lambda v: f"{v:,.0f}명"
+    elif basis == "total_cost":
+        bar_vals = total_cost_avg_eok
+        main_label = "총 진료비(연평균, 억원)"
+        main_value_fmt = lambda v: f"{v:.1f}억"
+    else:  # "cost_per_patient"
+        bar_vals = cpp_man
+        main_label = "1인당 진료비(만원)"
+        main_value_fmt = lambda v: f"{v:.1f}만"
 
     # Top1이 위로 오도록 reverse
     labels = labels[::-1]
-    total_cost_eok_avg = total_cost_eok_avg[::-1]
-    patient_cnt_avg = patient_cnt_avg[::-1]
+    bar_vals = bar_vals[::-1]
+    patient_avg = patient_avg[::-1]
+    total_cost_avg_eok = total_cost_avg_eok[::-1]
     cpp_man = cpp_man[::-1]
 
     y = list(range(len(labels)))
 
-    # -------------------------------------------------
-    # 메인(막대) & 보조(선 2개) 선택
-    # -------------------------------------------------
-    basis = (basis or "").strip()
-    if basis not in ("total_cost", "patient_cnt", "cost_per_patient"):
-        basis = "total_cost"
-
-    # 막대(메인)
-    if basis == "total_cost":
-        bar_vals = total_cost_eok_avg
-        bar_unit = "억원"
-        # 보조선 2개: 환자수 / 1인당
-        line1_vals = patient_cnt_avg
-        line1_unit = "명"
-        line1_label = "연평균 환자수(명)"
-        line2_vals = cpp_man
-        line2_unit = "만원"
-        line2_label = "1인당 진료비(만원)"
-    elif basis == "patient_cnt":
-        bar_vals = patient_cnt_avg
-        bar_unit = "명"
-        # 보조선 2개: 총진료비 / 1인당
-        line1_vals = total_cost_eok_avg
-        line1_unit = "억원"
-        line1_label = "연평균 총진료비(억원)"
-        line2_vals = cpp_man
-        line2_unit = "만원"
-        line2_label = "1인당 진료비(만원)"
-    else:  # cost_per_patient
-        bar_vals = cpp_man
-        bar_unit = "만원"
-        # 보조선 2개: 환자수 / 총진료비
-        line1_vals = patient_cnt_avg
-        line1_unit = "명"
-        line1_label = "연평균 환자수(명)"
-        line2_vals = total_cost_eok_avg
-        line2_unit = "억원"
-        line2_label = "연평균 총진료비(억원)"
-
-    # -------------------------------------------------
-    # formatters
-    # -------------------------------------------------
-    def fmt_int(x, pos=None):
-        return f"{int(round(x)):,}"
-
-    def fmt_1f(x, pos=None):
-        return f"{x:.1f}"
-
-    def fmt_bar(x, pos=None):
-        if bar_unit == "명":
-            return fmt_int(x, pos)
-        return fmt_1f(x, pos)
-
-    def fmt_line(unit: str):
-        if unit == "명":
-            return FuncFormatter(fmt_int)
-        return FuncFormatter(fmt_1f)
-
-    # -------------------------------------------------
-    # plot
-    # -------------------------------------------------
+    # -----------------------
+    # Plot
+    # -----------------------
     plt.close("all")
-    fig, ax_bar = plt.subplots(figsize=(12.5, 5.6), dpi=200)
+    fig, ax_bar = plt.subplots(figsize=(13.5, 5.6), dpi=200)
 
-    # 막대(가로)
+    # (1) 메인 막대
+    # 막대 색상은 기본(파랑) 유지. 선은 미래에셋 블루로 맞춤.
     ax_bar.barh(y, bar_vals)
     ax_bar.set_yticks(y)
     ax_bar.set_yticklabels(labels)
-    ax_bar.grid(axis="x", linestyle="--", alpha=0.35)
 
-    # 메인 지표는 막대 끝 텍스트 + 타이틀로만 안내
-    ax_bar.set_xlabel("")
-    ax_bar.set_xticks([])
-    ax_bar.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
+    # ✅ 메인 축(하단) 숫자 눈금 숨김 (요구사항)
+    ax_bar.xaxis.set_visible(False)
 
+    # 그리드는 참고용으로 약하게
+    ax_bar.grid(axis="x", linestyle="--", alpha=0.25)
 
-    # 보조선#1: 상단 X축
-    ax_top = ax_bar.twiny()
-    ax_top.plot(line1_vals, y, marker="o", linewidth=2, color=line1_color, label=line1_label)
-    ax_top.xaxis.set_major_formatter(fmt_line(line1_unit))
-    ax_top.set_xlabel(line1_label)
+    # (2) 보조 선 1: 연평균 총진료비(억원) - 상단 축 1
+    ax_cost = ax_bar.twiny()
+    l1 = ax_cost.plot(
+        total_cost_avg_eok, y,
+        marker="o", linewidth=2,
+        label="연평균 총진료비(억원)"
+    )
+    ax_cost.set_xlabel("연평균 총진료비(억원)")
+    ax_cost.spines["top"].set_position(("axes", 1.05))
+    ax_cost.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x:.0f}"))
 
-    # 보조선#2: 하단 X축(secondary xaxis) — 막대축과는 별개 스케일
-    # Matplotlib secondary_xaxis는 변환함수 필요하지만,
-    # 여기선 "독립 스케일"이 목적이므로 twiny를 하나 더 만들고 spine만 아래로 내림.
-    ax_bottom2 = ax_bar.twiny()
-    ax_bottom2.plot(line2_vals, y, marker="o", linewidth=2, color=line2_color, label=line2_label)
-    ax_bottom2.xaxis.set_major_formatter(fmt_line(line2_unit))
-    ax_bottom2.set_xlabel(line2_label)
+    # (3) 보조 선 2: 1인당 진료비(만원) - 상단 축 2 (미래에셋 블루)
+    ma_blue = "#003A8F"
+    ax_cpp = ax_bar.twiny()
+    l2 = ax_cpp.plot(
+        cpp_man, y,
+        marker="o", linewidth=2,
+        color=ma_blue,
+        label="1인당 진료비(만원)"
+    )
+    ax_cpp.set_xlabel("1인당 진료비(만원)")
+    ax_cpp.spines["top"].set_position(("axes", 1.18))
+    ax_cpp.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x:.0f}"))
 
-    # 두 번째 twiny 축을 "아래"로 내리기
-    ax_bottom2.xaxis.set_ticks_position("bottom")
-    ax_bottom2.xaxis.set_label_position("bottom")
-    # spine 이동 (아래쪽으로 살짝)
-    ax_bottom2.spines["bottom"].set_position(("axes", -0.18))
-    ax_bottom2.spines["top"].set_visible(False)
-    ax_bottom2.patch.set_visible(False)
+    # (4) 범례: 보조 선 2개만 (막대는 메인이라 타이틀에 이미 안내됨)
+    lines = l1 + l2
+    labels_legend = [ln.get_label() for ln in lines]
+    ax_bar.legend(lines, labels_legend, loc="lower right")
 
-    # 막대축의 bottom spine/label은 최소화(요청사항: 아래 축 안내 빼기)
-    ax_bar.spines["bottom"].set_alpha(0.3)
-
-    # -------------------------------------------------
-    # 범례(보조선 2개) — 명확하게
-    # -------------------------------------------------
-    handles = []
-    labels_legend = []
-    for a in (ax_top, ax_bottom2):
-        h, l = a.get_legend_handles_labels()
-        handles += h
-        labels_legend += l
-    ax_bar.legend(handles, labels_legend, loc="lower right", frameon=True)
-
-    # -------------------------------------------------
-    # 막대 끝 값 라벨(메인 값 + 보조 요약)
-    #   - 메인 지표값은 표시 (축값은 필수 아님)
-    # -------------------------------------------------
-    for i in range(len(labels)):
-        bv = bar_vals[i]
-        # 세 가지 값 모두 제공(연평균/단위 반영)
-        tc = total_cost_eok_avg[i]
-        pc = patient_cnt_avg[i]
-        cp = cpp_man[i]
-
-        # bv = 막대값(메인), pc=환자수(명), tc=총진료비(억원), cp=1인당(만원)
-
+    # (5) 막대 끝 라벨: 메인 1번 + (보조2개)
+    for i, (bv, pc, tc, cp) in enumerate(zip(bar_vals, patient_avg, total_cost_avg_eok, cpp_man)):
+        main_txt = main_value_fmt(bv)
+        sub_txt = f"(총 {tc:.1f}억 · 1인당 {cp:.1f}만)" if basis != "total_cost" else f"(환자 {pc:,.0f}명 · 1인당 {cp:.1f}만)"
+        # basis별로 괄호 구성은 자연스럽게(중복 회피)
         if basis == "patient_cnt":
-            main_txt = f"{int(pc):,}명"
-            sub_txt  = f"(총 {tc:.1f}억 · 1인당 {cp:.1f}만)"
-
+            sub_txt = f"(총 {tc:.1f}억 · 1인당 {cp:.1f}만)"
         elif basis == "total_cost":
-            main_txt = f"{tc:.1f}억"
-            sub_txt  = f"(환자 {int(pc):,}명 · 1인당 {cp:.1f}만)"
-
-        else:  # "cost_per_patient"
-            main_txt = f"{cp:.1f}만"
-            sub_txt  = f"(환자 {int(pc):,}명 · 총 {tc:.1f}억)"
+            sub_txt = f"(환자 {pc:,.0f}명 · 1인당 {cp:.1f}만)"
+        else:  # cost_per_patient
+            sub_txt = f"(환자 {pc:,.0f}명 · 총 {tc:.1f}억)"
 
         ax_bar.text(
             bv, i,
@@ -468,30 +410,23 @@ def build_top7_combo_chart_data_uri(
             fontsize=9
         )
 
-    # -------------------------------------------------
-    # 타이틀: 메인 지표 안내 포함(요청사항)
-    # -------------------------------------------------
-    basis_name = {
-        "total_cost": "총진료비(연평균, 억원)",
-        "patient_cnt": "환자수(연평균, 명)",
-        "cost_per_patient": "1인당 진료비(만원)",
-    }[basis]
-    fig.suptitle(f"{title} · 메인: {basis_name}", fontsize=14, fontweight="bold")
+    # (6) 타이틀: 메인 지표는 여기서만 안내
+    fig.suptitle(title + f" · 메인: {main_label}", fontsize=14, fontweight="bold")
 
-    fig.tight_layout(rect=[0, 0.03, 1, 0.93])
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
 
     buf = BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
     plt.close(fig)
+
     png_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{png_b64}"
 
 
-
 STAT_SORT_OPTIONS = {
-    "총 진료비(연간)": {"key": "total_cost", "label": "연간 진료비"},
-    "환자수(연간)": {"key": "patient_cnt", "label": "환자수"},
-    "1인당 진료비": {"key": "cost_per_patient", "label": "1인당"},
+    "총 진료비(연평균)": {"key": "total_cost"},
+    "환자수(연평균)": {"key": "patient_cnt"},
+    "1인당 진료비": {"key": "cost_per_patient"},
 }
 
 @st.cache_data(show_spinner=False, ttl=3600)
@@ -810,7 +745,12 @@ except Exception as e:
     st.error(f"D1 통계 조회 실패: {e}")
     top_rows = []
 
-chart_title = f"Top7 질병 통계 ({start_year}~{end_year} · {age_band} · {sex} · 기준: {sort_label})"
+sex_display = "남성" if sex == "M" else "여성"
+
+chart_title = (
+    f"Top7 질병 통계 "
+    f"({start_year}~{end_year} · {age_band} · {sex_display} · 기준: {sort_label})"
+)
 chart_data_uri = build_top7_combo_chart_data_uri(
     top_rows,
     title=chart_title,
