@@ -1,8 +1,8 @@
 # =========================================================
 # 최종 통합본 (유병률 기반 + 1인당 진료비 조건필터 + 현재/미래/신규부각 연동)
-# - Top10 기준: 총진료비(연평균) / 유병률(10만명당) / 1인당 진료비(기간평균)
+# - Top15 기준: 총진료비(연평균) / 유병률(10만명당) / 1인당 진료비(기간평균)
 # - 조건필터: (모든 기준에서) 최소 유병률 + 최소 1인당 진료비 적용
-# - 현재 연령대 / 이후 연령대(미래 위험) / 신규 부각 질병(현재 Top10에 없음) 모두 동일 조건을 따라감
+# - 현재 연령대 / 이후 연령대(미래 위험) / 신규 부각 질병(현재 Top15에 없음) 모두 동일 조건을 따라감
 # =========================================================
 
 import base64, json, hmac, hashlib, time, re
@@ -217,7 +217,7 @@ def manwon_to_chewon(m: int) -> int:
 
 
 # =========================================================
-# Chart (Top10 combo: bar 1 + line 2)  [유병률 기반]
+# Chart (Top15 combo: bar 1 + line 2)  [유병률 기반]
 # =========================================================
 def build_top10_combo_chart_data_uri(
     rows: list[dict],
@@ -227,7 +227,7 @@ def build_top10_combo_chart_data_uri(
     end_year: int,
 ) -> str:
     """
-    Top10 콤보 차트 (막대 1 + 보조선 2) - 유병률 버전
+    Top15 콤보 차트 (막대 1 + 보조선 2) - 유병률 버전
 
     rows 필드(필수):
       - disease_code
@@ -414,7 +414,7 @@ def fetch_top_rows(
     age_group: str,
     sex: str,
     sort_key: str = "total_cost",
-    limit: int = 10,
+    limit: int = 15,
     min_prev_100k: float | None = None,
     min_cpp_chewon: int | None = None,
 ) -> list[dict]:
@@ -480,7 +480,7 @@ def fetch_top_rows_after_age(
     after_age_groups: list[str],
     sex: str,
     sort_key: str = "total_cost",
-    limit: int = 10,
+    limit: int = 15,
     min_prev_100k: float | None = None,
     min_cpp_chewon: int | None = None,
 ) -> list[dict]:
@@ -739,7 +739,7 @@ if start_year > end_year:
     start_year, end_year = end_year, start_year
     st.info(f"시작/종료년도를 자동 보정했습니다: {start_year} ~ {end_year}")
 
-sort_label = st.radio("Top10 기준", options=list(STAT_SORT_OPTIONS.keys()), index=0, horizontal=True)
+sort_label = st.radio("Top15 기준", options=list(STAT_SORT_OPTIONS.keys()), index=0, horizontal=True)
 sort_key = STAT_SORT_OPTIONS[sort_label]["key"]
 
 # ✅ 조건필터: 유병률 + 1인당 진료비 (항상 노출, 둘 다 공통 적용)
@@ -776,7 +776,7 @@ except Exception as e:
     st.error(f"D1 통계 조회 실패: {e}")
     top_rows = []
 
-chart_title = f"Top10 질병 통계 ({start_year}~{end_year} · {age_band} · {sex_display} · 기준: {sort_label})"
+chart_title = f"Top15 질병 통계 ({start_year}~{end_year} · {age_band} · {sex_display} · 기준: {sort_label})"
 chart_data_uri = build_top10_combo_chart_data_uri(
     top_rows, title=chart_title, basis=sort_key,
     start_year=int(start_year), end_year=int(end_year),
@@ -787,7 +787,7 @@ if chart_data_uri:
 else:
     st.warning("차트를 만들 데이터가 없습니다. 조건을 바꿔보세요.")
 
-with st.expander("통계 상세 (Top10 테이블) - 현재 연령대"):
+with st.expander("통계 상세 (Top15 테이블) - 현재 연령대"):
     st.dataframe(
         [
             {
@@ -833,7 +833,7 @@ if after_groups and after_rows:
     )
     st.image(base64.b64decode(after_chart_uri.split(",", 1)[1]))
 
-    with st.expander("통계 상세 (Top10 테이블) - 이후 연령대 합산"):
+    with st.expander("통계 상세 (Top15 테이블) - 이후 연령대 합산"):
         st.dataframe(
             [
                 {
@@ -850,15 +850,15 @@ if after_groups and after_rows:
         )
 else:
     if after_groups:
-        st.warning("이후 연령대 합산 조건에서 Top10 데이터가 없습니다. 조건을 완화해 보세요.")
+        st.warning("이후 연령대 합산 조건에서 Top15 데이터가 없습니다. 조건을 완화해 보세요.")
 
 # -------------------------
-# 신규 부각 질병 (현재 Top10에 없음)
+# 신규 부각 질병 (현재 Top15에 없음)
 # -------------------------
 emerging_rows = pick_emerging_rows(top_rows, after_rows, limit=5)
 
 if emerging_rows:
-    st.markdown("#### 향후 새롭게 부각되는 질병 (현재 Top10에 없음)")
+    st.markdown("#### 향후 새롭게 부각되는 질병 (현재 Top15에 없음)")
     with st.expander("신규 부각 질병 상세", expanded=True):
         st.dataframe(
             [
@@ -875,7 +875,7 @@ if emerging_rows:
             hide_index=True,
         )
 else:
-    st.info("현재 Top10에 없는 ‘신규 부각 질병’이 없습니다. (현재와 이후가 유사한 패턴)")
+    st.info("현재 Top15에 없는 ‘신규 부각 질병’이 없습니다. (현재와 이후가 유사한 패턴)")
 
 st.markdown("---")
 
