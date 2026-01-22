@@ -146,6 +146,21 @@ html, body{
   object-fit:contain;
 }
 
+.header--secondary {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.header--secondary .title {
+  font-size: 18px;
+}
+
+.header--secondary .label {
+  font-size: 11px;
+}
+
+
 /* =========================
    Section title
    ========================= */
@@ -169,6 +184,36 @@ html, body{
   background:var(--blue);
   border-radius:3px;
 }
+
+/* 신규 부각 질병 – 컴팩트 테이블 */
+.section.emerging.compact table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;          /* 글자 작게 */
+}
+
+.section.emerging.compact th {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 6px;
+  background: #f5f7f9;
+}
+
+.section.emerging.compact td {
+  padding: 6px 6px;         /* 행 높이 축소 */
+  line-height: 1.3;
+}
+
+.section.emerging.compact tr + tr {
+  border-top: 1px solid #e5e8ec;
+}
+
+.compact-note {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
 
 /* =========================
    Bullets / Questions (안정화 버전)
@@ -285,6 +330,7 @@ html, body{
   font-weight:800;
 }
 .col2{ width:68%; }
+
 
 /* =========================
    CTA
