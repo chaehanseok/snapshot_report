@@ -669,6 +669,33 @@ def calc_table_height(
     h = header_height + row_height * max(row_count, 1)
     return max(min_height, min(h, max_height))
 
+def render_table_html(rows: list[dict]) -> str:
+    if not rows:
+        return ""
+
+    headers = [
+        "질병명",
+        "총진료비(연평균, 억원)",
+        "유병률(10만명당)",
+        "1인당 진료비(만원)",
+    ]
+
+    html = "<table><thead><tr>"
+    for h in headers:
+        html += f"<th>{h}</th>"
+    html += "</tr></thead><tbody>"
+
+    for r in rows:
+        html += "<tr>"
+        html += f"<td>{r.get('disease_name_ko') or r.get('disease_code')}</td>"
+        html += f"<td>{chewon_to_eok((float(r.get('total_cost') or 0) / years)):,.1f}</td>"
+        html += f"<td>{float(r.get('prevalence_per_100k') or 0):,.1f}</td>"
+        html += f"<td>{chewon_to_man(r.get('cost_per_patient')):,.1f}</td>"
+        html += "</tr>"
+
+    html += "</tbody></table>"
+    return html
+
 
 # =========================================================
 # PDF generation (Chromium via Playwright)
@@ -932,7 +959,13 @@ context = {
     "brand_name": BRAND_NAME,
     "brand_subtitle": BRAND_SUBTITLE,
     "version": APP_VERSION,
-    "customer": {"name": customer_name.strip() or "고객", "gender": gender, "age_band": age_band},
+
+    "customer": {
+        "name": customer_name.strip() or "고객",
+        "gender": gender,
+        "age_band": age_band,
+    },
+
     "planner": {
         "name": f"{planner['name']} FC",
         "phone": planner["phone"],
@@ -942,23 +975,46 @@ context = {
         "phone_display": planner_phone_display,
         "org_display": planner_org_display,
     },
+
     "segment": {
-        "headline": segment["headline"].replace("{customer_name}", (customer_name.strip() or "고객")),
+        "headline": segment["headline"].replace(
+            "{customer_name}", (customer_name.strip() or "고객")
+        ),
         "summary_lines": summary_lines,
         "gap_questions": gap_questions,
         "cta": cta_text,
     },
+
+    # =========================
+    # PAGE 1 통계
+    # =========================
     "stats": {
         "base_year": f"{start_year}~{end_year}",
-        "source": stats_db.get("source", "보건의료빅데이터개방시스템 - 건강보험심사평가원(요약)"),
+        "source": stats_db.get(
+            "source",
+            "보건의료빅데이터개방시스템 - 건강보험심사평가원(요약)",
+        ),
         "top7_basis": sort_label,
-        "chart_data_uri": chart_data_uri,
+        "chart_data_uri": chart_data_uri,   # 현재 연령대 차트
     },
+
+    # =========================
+    # PAGE 2 통계 (⭐ 핵심 추가)
+    # =========================
+    "after_chart_data_uri": after_chart_uri if after_rows else None,
+    "after_table": render_table_html(after_rows) if after_rows else "",
+    "emerging_table": render_table_html(emerging_rows) if emerging_rows else "",
+
     "structure_rows": structure_rows,
+
     "footer": stats_db.get(
         "footer",
         {
-            "disclaimer": "본 자료는 동일 연령·성별 집단의 통계 기반 참고 자료이며, 개인별 진단·보장 수준은 상이할 수 있습니다. 정확한 확인은 종합 보장분석을 통해 가능합니다.",
+            "disclaimer": (
+                "본 자료는 동일 연령·성별 집단의 통계 기반 참고 자료이며, "
+                "개인별 진단·보장 수준은 상이할 수 있습니다. "
+                "정확한 확인은 종합 보장분석을 통해 가능합니다."
+            ),
             "legal_note": "본 자료는 편의를 위해 제공되며 법적 효력을 갖지 않습니다.",
         },
     ),
