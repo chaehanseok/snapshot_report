@@ -2,26 +2,40 @@ import base64, json, hmac, hashlib, time, re
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+import os
+import sys
+import subprocess
+import requests
+
 import streamlit as st
 import streamlit.components.v1 as components
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from io import BytesIO
 
-import os
-from pathlib import Path
-import requests
-
-PW_DIR = Path("/tmp/pw-browsers")  # 가장 안전
+# =========================================================
+# Playwright runtime config (Streamlit Cloud-safe)
+# =========================================================
+PW_DIR = Path("/tmp/pw-browsers")  # 가장 안전(쓰기 가능)
 PW_DIR.mkdir(parents=True, exist_ok=True)
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(PW_DIR)
 
-st.caption(f"PLAYWRIGHT_BROWSERS_PATH={os.environ.get('PLAYWRIGHT_BROWSERS_PATH')}")
-st.caption(f"exists? {Path(os.environ['PLAYWRIGHT_BROWSERS_PATH']).exists()}")
 
-# ----------------------------
+@st.cache_resource(show_spinner=False)
+def ensure_playwright_chromium() -> bool:
+    """
+    Streamlit Cloud에서는 playwright 패키지 설치만으로는 브라우저 바이너리가 없음.
+    최초 1회만 chromium 다운로드 후 캐시됨.
+    """
+    browsers_path = Path(os.environ["PLAYWRIGHT_BROWSERS_PATH"])
+    has_chrome = any(browsers_path.glob("**/chrome-headless-shell")) or any(browsers_path.glob("**/chromium*"))
+    if not has_chrome:
+        subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+    return True
+
+
+# =========================================================
 # Config
-# ----------------------------
+# =========================================================
 APP_VERSION = "1.0.0"
 BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / "templates"
@@ -37,19 +51,18 @@ BRAND_SUBTITLE = "통계 기반 보장 점검 안내"
 
 ASSETS_DIR = TEMPLATES_DIR / "assets"
 FONT_DIR = ASSETS_DIR / "fonts"
-
-# 예: templates/assets/ma_logo.png
 LOGO_PATH = ASSETS_DIR / "ma_logo.png"
 
 SECRET = st.secrets.get("GATEWAY_SECRET", "")
 
 
-# ----------------------------
+# =========================================================
 # Token helpers
-# ----------------------------
+# =========================================================
 def b64url_decode(s: str) -> bytes:
     s += "=" * (-len(s) % 4)
     return base64.urlsafe_b64decode(s.encode("utf-8"))
+
 
 def verify_token(token: str) -> Dict[str, Any]:
     if not SECRET:
@@ -85,12 +98,13 @@ def verify_token(token: str) -> Dict[str, Any]:
     }
 
 
-# ----------------------------
+# =========================================================
 # Content loaders
-# ----------------------------
+# =========================================================
 @st.cache_data(show_spinner=False)
 def load_json(path: Path) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
 
 def segment_key(age_band: str, gender: str) -> str:
     if age_band.startswith("20"):
@@ -99,67 +113,100 @@ def segment_key(age_band: str, gender: str) -> str:
         a = "30"
     elif age_band.startswith("40"):
         a = "40"
-    else:
+    elif age_band.startswith("50"):
         a = "50"
+    else:
+        a = "60"
     g = "M" if gender == "남성" else "F"
     return f"{a}_{g}"
 
 
-import subprocess
-import sys
-import streamlit as st
-from pathlib import Path
-import os
-
-@st.cache_resource(show_spinner=False)
-def ensure_playwright_chromium():
-    browsers_path = Path(os.environ["PLAYWRIGHT_BROWSERS_PATH"])
-    # 설치 흔적이 없으면 설치
-    if not any(browsers_path.glob("**/chrome-headless-shell")) and not any(browsers_path.glob("**/chromium")):
-        # Playwright 공식 설치 커맨드(브라우저 다운로드) :contentReference[oaicite:2]{index=2}
-        subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
-    return True
-
-def d1_query(sql: str, params: list | None = None) -> list[dict]:
+# =========================================================
+# D1 query (Cloudflare D1 REST API)
+# =========================================================
+def d1_query(sql: str, params: list) -> list[dict]:
     """
-    Cloudflare D1 HTTP API로 SQL 실행.
-    반환: rows(list[dict])만 깔끔하게 리턴.
+    secrets 필요:
+      CF_ACCOUNT_ID
+      CF_API_TOKEN
+      CF_D1_DB_ID
     """
-    account_id = st.secrets.get("CF_ACCOUNT_ID", "")
-    db_id = st.secrets.get("D1_DATABASE_ID", "")
-    token = st.secrets.get("CF_API_TOKEN", "")
-
-    if not (account_id and db_id and token):
-        raise RuntimeError("D1 연결정보가 없습니다. Secrets에 CF_ACCOUNT_ID, D1_DATABASE_ID, CF_API_TOKEN을 설정하세요.")
+    account_id = st.secrets["CF_ACCOUNT_ID"]
+    api_token = st.secrets["CF_API_TOKEN"]
+    db_id = st.secrets["CF_D1_DB_ID"]
 
     url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{db_id}/query"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "sql": sql,
-        "params": params or [],
-    }
+    headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
+    payload = {"sql": sql, "params": params}
 
     r = requests.post(url, headers=headers, json=payload, timeout=30)
     r.raise_for_status()
     data = r.json()
 
     if not data.get("success"):
-        # Cloudflare가 주는 에러 메시지 노출
-        raise RuntimeError(f"D1 query failed: {data.get('errors')}")
+        raise RuntimeError(f"D1 query failed: {data}")
 
-    # D1 응답은 result 배열로 오고, 첫 쿼리의 rows가 여기 들어감
-    result0 = (data.get("result") or [{}])[0]
-    rows = result0.get("results") or []
-    return rows
-
+    blocks = data.get("result", [])
+    if not blocks:
+        return []
+    return blocks[0].get("results", [])
 
 
-# ----------------------------
-# Utilities
-# ----------------------------
+# =========================================================
+# Stats helpers (Top N cards)
+# =========================================================
+def format_krw_compact(n: float | int) -> str:
+    n = float(n or 0)
+    if n >= 1e8:
+        return f"{n/1e8:.1f}억"
+    if n >= 1e4:
+        return f"{n/1e4:.0f}만"
+    return f"{n:.0f}"
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def fetch_top_cards(year: int, age_group: str, sex: str, limit: int = 7) -> list[dict]:
+    """
+    동일 연도/연령/성별에서 total_cost 기준 상위 N개 질병 카드 생성
+    disease 테이블 조인해서 disease_name_ko 표시
+    """
+    sql = """
+    SELECT
+      COALESCE(d.disease_name_ko, m.disease_code) AS disease_name_ko,
+      SUM(m.patient_cnt) AS patient_cnt,
+      SUM(m.total_cost)  AS total_cost,
+      CAST(SUM(m.total_cost) AS REAL) / NULLIF(SUM(m.patient_cnt), 0) AS cost_per_patient
+    FROM disease_year_age_sex_metrics m
+    LEFT JOIN disease d
+      ON m.disease_code = d.disease_code
+    WHERE m.year = ?
+      AND m.age_group = ?
+      AND m.sex = ?
+    GROUP BY COALESCE(d.disease_name_ko, m.disease_code)
+    ORDER BY total_cost DESC
+    LIMIT ?;
+    """
+    rows = d1_query(sql, [year, age_group, sex, int(limit)])
+
+    cards: list[dict] = []
+    for r in rows:
+        name = (r.get("disease_name_ko") or "").strip() or "질병"
+        patient_cnt = int(r.get("patient_cnt") or 0)
+        total_cost = float(r.get("total_cost") or 0)
+        cpp = float(r.get("cost_per_patient") or 0)
+
+        cards.append(
+            {
+                "title": name,
+                "value": f"연간 진료비 {format_krw_compact(total_cost)} · 환자 {patient_cnt:,}명 · 1인당 {format_krw_compact(cpp)}",
+            }
+        )
+    return cards
+
+
+# =========================================================
+# Utilities (rendering)
+# =========================================================
 def format_phone_3_4_4(phone: str) -> str:
     d = re.sub(r"\D", "", phone or "")
     if len(d) == 11:
@@ -168,9 +215,11 @@ def format_phone_3_4_4(phone: str) -> str:
         return f"{d[:3]}-{d[3:6]}-{d[6:]}"
     return phone
 
+
 def org_display(company: str, org: str) -> str:
     org = (org or "").strip()
     return f"{company} · {org}" if org else company
+
 
 def file_to_data_uri(path: Path, mime: str) -> Optional[str]:
     if not path.exists():
@@ -178,16 +227,13 @@ def file_to_data_uri(path: Path, mime: str) -> Optional[str]:
     data = base64.b64encode(path.read_bytes()).decode("utf-8")
     return f"data:{mime};base64,{data}"
 
+
 def font_file_to_data_uri(path: Path) -> str:
     data = base64.b64encode(path.read_bytes()).decode("utf-8")
     return f"data:font/ttf;base64,{data}"
 
 
 def build_embedded_font_face_css() -> str:
-    """
-    폰트를 '치환'하지 않고, 항상 최상단에 강제 선언해서
-    미리보기/WeasyPrint의 폰트 일치도를 극대화한다.
-    """
     regular_ttf = FONT_DIR / "NotoSansKR-Regular.ttf"
     bold_ttf = FONT_DIR / "NotoSansKR-Bold.ttf"
 
@@ -201,7 +247,6 @@ def build_embedded_font_face_css() -> str:
     bold_uri = font_file_to_data_uri(bold_ttf)
 
     return f"""
-/* ===== Embedded Fonts (Data URI) ===== */
 @font-face {{
   font-family: "NotoSansKR";
   src: url("{reg_uri}") format("truetype");
@@ -218,147 +263,61 @@ def build_embedded_font_face_css() -> str:
 
 
 def build_css_for_both(css_path: Path) -> str:
-    """
-    - style.css 원문 + (1) 임베딩 폰트 강제 + (2) bullet/number 커스텀 고정
-    """
     base_css = css_path.read_text(encoding="utf-8")
-
-    # (A) 폰트 선언을 맨 위로 강제
     font_css = build_embedded_font_face_css()
 
-    # (B) WeasyPrint에서 list marker 누락을 피하려고 커스텀 마커로 확정
-    #     (원 CSS에서 bullets/questions를 list-style로 쓰더라도, 마지막 override로 고정됨)
     bullet_fix_css = """
-/* ===== List marker stabilization (Browser + WeasyPrint) ===== */
-/* bullets: 점(•)을 직접 찍어서 PDF에서 안 보이는 문제 회피 */
-.bullets{
-  list-style:none !important;
-  margin:0 !important;
-  padding-left:0 !important;
-}
-.bullets li{
-  position:relative;
-  padding-left:16px;
-  margin:5px 0;
-}
-.bullets li::before{
-  content:"•";
-  position:absolute;
-  left:0;
-  top:0;
-}
+/* bullets: 점(•) 직접 렌더 */
+.bullets{ list-style:none !important; margin:0 !important; padding-left:0 !important; }
+.bullets li{ position:relative; padding-left:16px; margin:5px 0; }
+.bullets li::before{ content:"•"; position:absolute; left:0; top:0; }
 
-/* questions: counter로 번호를 직접 찍어서 렌더 불일치 최소화 */
-.questions{
-  list-style:none !important;
-  margin:0 !important;
-  padding-left:0 !important;
-  counter-reset:q;
-}
-.questions li{
-  position:relative;
-  padding-left:18px;
-  margin:6px 0;
-}
+/* questions: counter로 번호 직접 렌더 */
+.questions{ list-style:none !important; margin:0 !important; padding-left:0 !important; counter-reset:q; }
+.questions li{ position:relative; padding-left:18px; margin:6px 0; }
 .questions li::before{
   counter-increment:q;
   content: counter(q) ".";
-  position:absolute;
-  left:0;
-  top:0;
-  font-weight:700;
-}
-
-/* preview-viewport이 비정상 구조일 때 빈 여백 생기는 것 방지용 기본값 */
-.preview-viewport{
-  display:block;
+  position:absolute; left:0; top:0; font-weight:700;
 }
 """
-
     return f"{font_css}\n{base_css}\n{bullet_fix_css}"
 
 
 def render_html(context: Dict[str, Any]) -> str:
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
-        autoescape=select_autoescape(["html", "xml"])
+        autoescape=select_autoescape(["html", "xml"]),
     )
     template = env.get_template(HTML_TEMPLATE)
     return template.render(**context)
 
 
-def fix_preview_wrapper_structure(html: str) -> str:
-    """
-    템플릿이 아래처럼 잘못된 경우를 자동으로 보정:
-      <div class="preview-viewport"></div>
-        <div class="page">...
-
-    -> 아래처럼 바꿔서 스케일 스크립트가 정상 동작하게 함:
-      <div class="preview-viewport">
-        <div class="page">...
-    """
-    # 케이스1) 빈 preview-viewport를 닫아버린 경우
-    html = re.sub(
-        r'<div class="preview-viewport">\s*</div>\s*<div class="page">',
-        r'<div class="preview-viewport">\n<div class="page">',
-        html,
-        flags=re.IGNORECASE
-    )
-
-    # 케이스2) preview-viewport가 아예 없고 page만 있는 경우: page를 감싸준다(가능한 범위에서)
-    if 'class="preview-viewport"' not in html and 'class="page"' in html:
-        html = html.replace('<div class="page">', '<div class="preview-viewport">\n<div class="page">', 1)
-        # body 닫기 직전에 viewport 닫기 추가(간단 보정)
-        html = html.replace("</body>", "\n</div>\n</body>", 1)
-
-    return html
-
-
 def inject_inline_css(html: str, css_text: str, css_path_in_template: str) -> str:
-    """
-    템플릿의 <link rel="stylesheet" ...>를 <style>로 치환.
-    """
     needle = f'<link rel="stylesheet" href="{css_path_in_template}" />'
     if needle in html:
         return html.replace(needle, f"<style>\n{css_text}\n</style>")
-    # 혹시 템플릿에서 href가 다르면, link 태그를 더 넓게 잡아서 제거/주입
-    html = re.sub(
+
+    # fallback
+    return re.sub(
         r'<link\s+rel=["\']stylesheet["\']\s+href=["\'][^"\']+["\']\s*/?>',
         f"<style>\n{css_text}\n</style>",
         html,
         count=1,
-        flags=re.IGNORECASE
+        flags=re.IGNORECASE,
     )
-    return html
 
 
 def build_final_html_for_both(context: Dict[str, Any]) -> str:
-    """
-    미리보기/WeasyPrint 모두 같은 HTML을 쓰고,
-    CSS도 동일(인라인)하게 주입하여 결과를 최대한 일치시킨다.
-    """
     html = render_html(context)
-    html = fix_preview_wrapper_structure(html)
-
     css_text = build_css_for_both(CSS_PATH)
     html = inject_inline_css(html, css_text, str(context["css_path"]))
-
     return html
 
 
-# ----------------------------
-# PDF generation (WeasyPrint)
-# ----------------------------
-def weasyprint_pdf_bytes(html: str) -> bytes:
-    try:
-        from weasyprint import HTML  # type: ignore
-    except Exception:
-        raise RuntimeError("WeasyPrint not installed. requirements.txt에 weasyprint를 추가하고 배포 환경에서 설치해 주세요.")
-
-    # JS는 WeasyPrint에서 무시되므로(정상), preview용 scale 스크립트가 PDF를 망치지 않는다.
-    return HTML(string=html, base_url=str(TEMPLATES_DIR)).write_pdf()
-
-
+# =========================================================
+# PDF generation (Chromium via Playwright)
+# =========================================================
 def chromium_pdf_bytes(html: str) -> bytes:
     from playwright.sync_api import sync_playwright
 
@@ -370,7 +329,7 @@ def chromium_pdf_bytes(html: str) -> bytes:
 
         page.set_content(html, wait_until="load")
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(100)  # 레이아웃/폰트 settle
+        page.wait_for_timeout(150)  # 폰트/레이아웃 settle
 
         pdf_bytes = page.pdf(
             format="A4",
@@ -381,11 +340,14 @@ def chromium_pdf_bytes(html: str) -> bytes:
         return pdf_bytes
 
 
-
-# ----------------------------
+# =========================================================
 # Streamlit UI
-# ----------------------------
+# =========================================================
 st.set_page_config(page_title="보장 점검 유인 팜플렛", layout="centered")
+
+# 디버그 표시(원하면 나중에 지워도 됨)
+st.caption(f"PLAYWRIGHT_BROWSERS_PATH={os.environ.get('PLAYWRIGHT_BROWSERS_PATH')}")
+st.caption(f"exists? {Path(os.environ['PLAYWRIGHT_BROWSERS_PATH']).exists()}")
 
 token = st.query_params.get("token")
 if not token:
@@ -397,52 +359,6 @@ try:
 except Exception as e:
     st.error(f"접속 검증 실패: {e}")
     st.stop()
-
-st.subheader("D1 연결 테스트")
-
-colA, colB = st.columns([1, 2])
-with colA:
-    test_year = st.selectbox("샘플 연도", ["2024", "2023", "2022", "2021"], index=0)
-    test_age = st.selectbox("샘플 연령", ["50_59", "40_49", "30_39", "20_29", "60_69"], index=0)
-    test_sex = st.selectbox("샘플 성별", ["A", "M", "F"], index=0)
-
-with colB:
-    st.caption("샘플: 특정 연도/연령/성별에서 5개 질병만 미리보기")
-
-if st.button("D1 샘플 조회", type="primary"):
-    sql = """
-    SELECT disease_code, year, age_group, sex, patient_cnt, total_cost, visit_days,
-           population, prevalence_per_100k, cost_per_patient
-    FROM disease_year_age_sex_metrics
-    WHERE year = ? AND age_group = ? AND sex = ?
-    ORDER BY prevalence_per_100k DESC
-    LIMIT 5;
-    """
-    try:
-        rows = d1_query(sql, [int(test_year), test_age, test_sex])
-        if not rows:
-            st.warning("조회 결과가 없습니다.")
-        else:
-            st.dataframe(rows, use_container_width=True)
-    except Exception as e:
-        st.error(f"D1 조회 실패: {e}")
-
-with st.expander("데이터 범위/건수 확인"):
-    if st.button("범위 확인"):
-        sql = """
-        SELECT
-          MIN(year) AS min_year,
-          MAX(year) AS max_year,
-          COUNT(*)  AS row_cnt,
-          COUNT(DISTINCT disease_code) AS disease_cnt
-        FROM disease_year_age_sex_metrics;
-        """
-        try:
-            rows = d1_query(sql)
-            st.json(rows[0] if rows else {})
-        except Exception as e:
-            st.error(f"범위 확인 실패: {e}")
-
 
 segments_db = load_json(SEGMENTS_PATH)
 stats_db = load_json(STATS_PATH)
@@ -462,11 +378,31 @@ age_band = st.selectbox("연령대", ["20대", "30대", "40대", "50대", "60대
 
 key = segment_key(age_band, gender)
 segment = segments_db["segments"].get(key)
-cards = stats_db["cards"].get(key)
-
-if not segment or not cards:
+if not segment:
     st.error(f"콘텐츠 세트가 없습니다: {key}")
     st.stop()
+
+# ---------------------------------------------------------
+# D1 기반 통계 카드 구성 (Top7)
+# ---------------------------------------------------------
+# age_band -> DB age_group 매핑은 네 DB에 맞게 여기서 매핑
+AGE_GROUP_MAP = {
+    "20대": "20_29",
+    "30대": "30_39",
+    "40대": "40_49",
+    "50대": "50_59",
+    "60대 이상": "60_69",
+}
+age_group = AGE_GROUP_MAP.get(age_band, "50_59")
+sex = "M" if gender == "남성" else "F"
+year = int(stats_db.get("base_year", 2024))
+
+try:
+    cards = fetch_top_cards(year, age_group, sex, limit=7)
+except Exception as e:
+    st.error(f"D1 통계 조회 실패: {e}")
+    cards = []
+
 
 st.subheader("문구 조정(선택/제한)")
 summary_lines = segment["summary_lines"][:]
@@ -488,7 +424,7 @@ structure_rows = [
     {"area": "생활·소득", "reason": "치료로 인한 소득 공백·가계 영향 점검"},
 ]
 
-logo_data_uri = file_to_data_uri(LOGO_PATH, "image/png")  # ma_logo.png 기준
+logo_data_uri = file_to_data_uri(LOGO_PATH, "image/png")
 
 context = {
     "css_path": str(CSS_PATH),
@@ -496,13 +432,8 @@ context = {
     "brand_name": BRAND_NAME,
     "brand_subtitle": BRAND_SUBTITLE,
     "version": APP_VERSION,
-    "customer": {
-        "name": customer_name.strip() or "고객",
-        "gender": gender,
-        "age_band": age_band
-    },
+    "customer": {"name": customer_name.strip() or "고객", "gender": gender, "age_band": age_band},
     "planner": {
-        # 요구사항 반영: "박동혁 FC" 형태
         "name": f"{planner['name']} FC",
         "phone": planner["phone"],
         "email": planner.get("email", None),
@@ -515,29 +446,27 @@ context = {
         "headline": segment["headline"].replace("{customer_name}", (customer_name.strip() or "고객")),
         "summary_lines": summary_lines,
         "gap_questions": gap_questions,
-        "cta": cta_text
+        "cta": cta_text,
     },
     "stats": {
-        "base_year": stats_db.get("base_year", "2024"),
+        "base_year": str(year),
         "source": stats_db.get("source", "공식 보건의료 통계(요약)"),
-        "cards": cards
+        "cards": cards,  # ✅ D1 Top7 카드 반영
     },
     "structure_rows": structure_rows,
-    "footer": stats_db.get("footer", {
-        "disclaimer": "본 자료는 동일 연령·성별 집단의 통계 기반 참고 자료이며, 개인별 진단·보장 수준은 상이할 수 있습니다. 정확한 확인은 종합 보장분석을 통해 가능합니다.",
-        "legal_note": "본 자료는 편의를 위해 제공되며 법적 효력을 갖지 않습니다."
-    })
+    "footer": stats_db.get(
+        "footer",
+        {
+            "disclaimer": "본 자료는 동일 연령·성별 집단의 통계 기반 참고 자료이며, 개인별 진단·보장 수준은 상이할 수 있습니다. 정확한 확인은 종합 보장분석을 통해 가능합니다.",
+            "legal_note": "본 자료는 편의를 위해 제공되며 법적 효력을 갖지 않습니다.",
+        },
+    ),
 }
 
 final_html = build_final_html_for_both(context)
 
 st.subheader("미리보기")
-# 스케일 스크립트가 viewport 높이를 잡아주므로, scrolling=False가 더 깔끔한 경우가 많음
-components.html(
-    final_html,
-    height=900,          # 처음엔 작게
-    scrolling=True,
-)
+components.html(final_html, height=900, scrolling=True)
 
 st.divider()
 st.subheader("확정 및 PDF 출력")
@@ -547,19 +476,13 @@ if st.button("확정 후 PDF 생성"):
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
 
-    # 고객명 확정 반영
     context["customer"]["name"] = customer_name.strip()
     context["segment"]["headline"] = segment["headline"].replace("{customer_name}", customer_name.strip())
     final_html = build_final_html_for_both(context)
 
-    ensure_playwright_chromium()
-
     try:
         pdf_bytes = chromium_pdf_bytes(final_html)
         filename = f"보장점검안내_{customer_name.strip()}_{age_band}_{gender}.pdf"
-
-        # 새 탭 열지 않고 바로 다운로드만 제공 (Chrome 차단 회피)
         st.download_button("PDF 다운로드", data=pdf_bytes, file_name=filename, mime="application/pdf")
-        
     except Exception as e:
-        st.error(f"PDF 생성(WeasyPrint) 중 오류가 발생했습니다.\n\n오류: {e}")
+        st.error(f"PDF 생성(Playwright) 중 오류가 발생했습니다.\n\n오류: {e}")
