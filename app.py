@@ -59,16 +59,6 @@ LOGO_PATH = ASSETS_DIR / "ma_logo.png"
 
 SECRET = st.secrets.get("GATEWAY_SECRET", "")
 
-
-def debug_font(path: Path, label: str):
-    st.write(label, "exists:", path.exists())
-    if path.exists():
-        b = path.read_bytes()[:4]
-        st.write(label, "size:", path.stat().st_size, "header:", b)
-
-debug_font(FONT_DIR/"NotoSansKR-Regular.ttf", "REG")
-debug_font(FONT_DIR/"NotoSansKR-Bold.ttf", "BOLD")
-
 # =========================================================
 # Token helpers
 # =========================================================
@@ -599,8 +589,6 @@ chart_title = f"Top7 질병 통계 ({start_year}~{end_year} · {age_band} · {se
 chart_data_uri = build_top7_combo_chart_data_uri(top_rows, chart_title)
 
 st.markdown("#### 통계 미리보기 (차트)")
-
-st.caption(f"matplotlib font = {matplotlib.rcParams['font.family']}")
 
 if chart_data_uri:
     # Streamlit에서는 data uri 바로 st.image 가능
