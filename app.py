@@ -1,12 +1,14 @@
 import base64, json, hmac, hashlib, time, re
 from pathlib import Path
 from typing import Dict, Any, Optional
+import pandas as pd
 
 import os
 import sys
 import subprocess
 import requests
 from io import BytesIO
+import base64
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -191,74 +193,156 @@ def format_krw_compact(n: float | int) -> str:
         return f"{n/1e4:.0f}만"
     return f"{n:.0f}"
 
-def build_top7_combo_chart_data_uri(rows: list[dict], title: str) -> str | None:
+def build_top7_combo_chart_data_uri(
+    rows: list[dict],
+    title: str,
+    basis: str,
+) -> str:
     """
-    rows: [{"disease_name_ko", "total_cost", "cost_per_patient", "patient_cnt"}...]
-    -> PNG bytes -> data:image/png;base64,...
+    rows: fetch_top_rows() 결과
+      - disease_code
+      - disease_name_ko
+      - patient_cnt (명)
+      - total_cost (천원)
+      - cost_per_patient (천원)
+
+    basis:
+      - "total_cost"        : 총진료비(기간합)
+      - "patient_cnt"       : 환자수(기간합)
+      - "cost_per_patient"  : 1인당 진료비(기간평균)
     """
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import FuncFormatter
+
     if not rows:
-        return None
-    
-    configure_matplotlib_korean_font()  # ✅ 이 줄이 핵심
+        return ""
 
-    names = [str(r.get("disease_name_ko") or r.get("disease_code") or "").strip() for r in rows]
-    total_cost = [float(r.get("total_cost") or 0) for r in rows]
-    cpp = [float(r.get("cost_per_patient") or 0) for r in rows]
-    patient = [int(r.get("patient_cnt") or 0) for r in rows]
+    # -----------------------
+    # Unit conversions
+    # -----------------------
+    def to_억원_from_천원(x: float) -> float:
+        # 1억 원 = 100,000천원
+        return float(x or 0) / 100000.0
 
-    # 가로막대는 위->아래 읽기 자연스럽게 역순(큰 값이 위로)
-    names = names[::-1]
-    total_cost = total_cost[::-1]
-    cpp = cpp[::-1]
-    patient = patient[::-1]
+    def to_만원_from_천원(x: float) -> float:
+        # 1만 원 = 10천원
+        return float(x or 0) / 10.0
 
-    # figsize는 A4 섹션에 잘 맞도록
-    fig = plt.figure(figsize=(10.6, 4.2), dpi=180)
-    ax = fig.add_subplot(111)
-    ax2 = ax.twiny()  # 가로막대축과 다른 축 공유(라인용)
+    # -----------------------
+    # Prepare labels/values
+    # -----------------------
+    disease_labels = []
+    disease_codes = []
+    total_cost_억원 = []
+    patient_cnt = []
+    cpp_만원 = []
 
-    y = list(range(len(names)))
+    for r in rows:
+        code = (r.get("disease_code") or "").strip()
+        name = (r.get("disease_name_ko") or "").strip() or code or "질병"
+        disease_codes.append(code)
+        # 라벨에 코드까지 같이 표시하면 상담 시 더 명확해짐(원하면 제거 가능)
+        disease_labels.append(f"{name} ({code})" if code else name)
 
-    # Bar: total_cost
-    ax.barh(y, total_cost, height=0.62, alpha=0.95)
+        patient_cnt.append(float(r.get("patient_cnt") or 0))
+        total_cost_억원.append(to_억원_from_천원(float(r.get("total_cost") or 0)))
+        cpp_만원.append(to_만원_from_천원(float(r.get("cost_per_patient") or 0)))
 
-    # Line: cost_per_patient (같은 y좌표에 찍기)
-    ax2.plot(cpp, y, marker="o", linewidth=2)
+    # -----------------------
+    # Choose bar/line by basis
+    # (원칙: 막대 = 기준, 선 = 보조)
+    # -----------------------
+    if basis == "total_cost":
+        bar_vals = total_cost_억원
+        bar_label = "총 진료비(기간합) [억원]"
+        line_vals = patient_cnt
+        line_label = "환자수(기간합) [명]"
+        line_axis = "top"  # 상단 축에 선(환자수)
 
-    ax.set_yticks(y)
-    ax.set_yticklabels(names, fontsize=9)
+    elif basis == "patient_cnt":
+        bar_vals = patient_cnt
+        bar_label = "환자수(기간합) [명]"
+        line_vals = total_cost_억원
+        line_label = "총 진료비(기간합) [억원]"
+        line_axis = "top"  # 상단 축에 선(총진료비)
 
-    # 축 포맷터(원 단위)
-    def krw_fmt(x, _):
-        x = float(x or 0)
-        if x >= 1e8:
-            return f"{x/1e8:.1f}억"
-        if x >= 1e4:
-            return f"{x/1e4:.0f}만"
-        return f"{x:.0f}"
+    else:  # "cost_per_patient"
+        bar_vals = cpp_만원
+        bar_label = "1인당 진료비(기간평균) [만원]"
+        line_vals = patient_cnt
+        line_label = "환자수(기간합) [명]"
+        line_axis = "top"
 
-    ax.xaxis.set_major_formatter(FuncFormatter(krw_fmt))
-    ax2.xaxis.set_major_formatter(FuncFormatter(krw_fmt))
+    # Y축은 위에서 아래로 보기 좋게 (Top1이 맨 위)
+    # rows가 이미 DESC 정렬이라 가정 -> 그대로 그리면 Top1이 아래로 가므로 뒤집음
+    disease_labels = disease_labels[::-1]
+    bar_vals = bar_vals[::-1]
+    line_vals = line_vals[::-1]
+    patient_cnt_rev = patient_cnt[::-1]
+    total_cost_억원_rev = total_cost_억원[::-1]
+    cpp_만원_rev = cpp_만원[::-1]
 
-    ax.set_xlabel("총 진료비(기간합)")
-    ax2.set_xlabel("1인당 진료비")
+    y = list(range(len(disease_labels)))
 
-    # 환자수(참고) 텍스트를 막대 끝에 찍기
-    for yi, v, p in zip(y, total_cost, patient):
-        ax.text(v, yi, f"  {p:,}명", va="center", fontsize=8)
+    # -----------------------
+    # Plot
+    # -----------------------
+    plt.close("all")
+    fig, ax_bar = plt.subplots(figsize=(12.5, 5.2), dpi=200)
 
-    ax.grid(True, axis="x", linestyle="--", alpha=0.35)
-    ax.set_title(title, fontsize=12, fontweight="bold", pad=10)
+    # 막대
+    ax_bar.barh(y, bar_vals)
+    ax_bar.set_yticks(y)
+    ax_bar.set_yticklabels(disease_labels)
+    ax_bar.set_xlabel(bar_label)
+    ax_bar.grid(axis="x", linestyle="--", alpha=0.4)
 
-    # 여백 최적화
-    fig.tight_layout()
+    # 보조축 (선)
+    ax_line = ax_bar.twiny() if line_axis == "top" else ax_bar.twinx()
+    ax_line.plot(line_vals, y, marker="o", linewidth=2)
+    ax_line.set_xlabel(line_label)
 
-    # PNG로 저장 -> base64
+    # 숫자 포맷터
+    def fmt_int(x, pos=None):
+        return f"{int(x):,}"
+
+    def fmt_억원(x, pos=None):
+        return f"{x:.1f}"
+
+    def fmt_만원(x, pos=None):
+        return f"{x:.1f}"
+
+    # 막대축/선축 포맷
+    if basis == "total_cost":
+        ax_bar.xaxis.set_major_formatter(FuncFormatter(fmt_억원))
+        ax_line.xaxis.set_major_formatter(FuncFormatter(fmt_int))
+    elif basis == "patient_cnt":
+        ax_bar.xaxis.set_major_formatter(FuncFormatter(fmt_int))
+        ax_line.xaxis.set_major_formatter(FuncFormatter(fmt_억원))
+    else:  # cost_per_patient
+        ax_bar.xaxis.set_major_formatter(FuncFormatter(fmt_만원))
+        ax_line.xaxis.set_major_formatter(FuncFormatter(fmt_int))
+
+    # 각 막대 끝에 보조 정보 라벨(읽기 좋아짐)
+    # 기준에 따라 표시 조합을 바꿈
+    for i, (bv, pc, tc, cp) in enumerate(zip(bar_vals, patient_cnt_rev, total_cost_억원_rev, cpp_만원_rev)):
+        # i는 y index
+        if basis == "patient_cnt":
+            # 막대=환자수, 옆에 총진료비/1인당 표시
+            ax_bar.text(bv, i, f"  {int(pc):,}명 · {tc:.1f}억 · {cp:.1f}만", va="center", fontsize=9)
+        elif basis == "total_cost":
+            ax_bar.text(bv, i, f"  {tc:.1f}억 · {int(pc):,}명 · {cp:.1f}만", va="center", fontsize=9)
+        else:
+            ax_bar.text(bv, i, f"  {cp:.1f}만 · {int(pc):,}명 · {tc:.1f}억", va="center", fontsize=9)
+
+    fig.suptitle(title, fontsize=14, fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
     buf = BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
     plt.close(fig)
-    data = base64.b64encode(buf.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{data}"
+    png_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return f"data:image/png;base64,{png_b64}"
 
 
 STAT_SORT_OPTIONS = {
@@ -268,7 +352,7 @@ STAT_SORT_OPTIONS = {
 }
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def fetch_top_cards(
+def fetch_top_rows(
     start_year: int,
     end_year: int,
     age_group: str,
@@ -277,9 +361,10 @@ def fetch_top_cards(
     limit: int = 7,
 ) -> list[dict]:
     """
-    기간(start_year~end_year) + 연령/성별에서 sort_key 기준 상위 N개 질병 카드 생성
-    disease 테이블 조인해서 disease_name_ko 표시
+    기간(start_year~end_year) + 연령/성별에서 sort_key 기준 상위 N개 질병 rows 반환
     sort_key: total_cost | patient_cnt | cost_per_patient
+    반환 컬럼:
+      disease_code, disease_name_ko, patient_cnt, total_cost(천원), cost_per_patient(천원)
     """
     if sort_key not in ("total_cost", "patient_cnt", "cost_per_patient"):
         sort_key = "total_cost"
@@ -312,28 +397,6 @@ def fetch_top_cards(
     """
 
     rows = d1_query(sql, [int(start_year), int(end_year), age_group, sex, int(limit)])
-
-    cards: list[dict] = []
-    for r in rows:
-        name = (r.get("disease_name_ko") or r.get("disease_code") or "").strip() or "질병"
-        patient_cnt = int(r.get("patient_cnt") or 0)
-        total_cost = float(r.get("total_cost") or 0)
-        cpp = float(r.get("cost_per_patient") or 0)
-
-        if sort_key == "total_cost":
-            lead = f"연간 진료비 {format_krw_compact(total_cost)}"
-        elif sort_key == "patient_cnt":
-            lead = f"환자 {patient_cnt:,}명"
-        else:
-            lead = f"1인당 {format_krw_compact(cpp)}"
-
-        cards.append(
-            {
-                "title": name,
-                "value": f"{lead} · 진료비 {format_krw_compact(total_cost)} · 환자 {patient_cnt:,}명 · 1인당 {format_krw_compact(cpp)}",
-            }
-        )
-    # ✅ rows를 그대로 반환 (차트/표/카드 모두 여기서 파생)
     return rows
 
 
@@ -447,6 +510,28 @@ def build_final_html_for_both(context: Dict[str, Any]) -> str:
     html = inject_inline_css(html, css_text, str(context["css_path"]))
     return html
 
+
+def build_top_table_df(rows: list[dict]) -> "pd.DataFrame":
+    if not rows:
+        return pd.DataFrame(columns=["disease_code", "질병", "총진료비(억원)", "환자수", "1인당(만원)"])
+
+    data = []
+    for r in rows:
+        code = (r.get("disease_code") or "").strip()
+        name = (r.get("disease_name_ko") or "").strip() or code
+
+        total_cost_억원 = float(r.get("total_cost") or 0) / 100000.0
+        cpp_만원 = float(r.get("cost_per_patient") or 0) / 10.0
+
+        data.append({
+            "disease_code": code,
+            "질병": name,
+            "총진료비(억원)": round(total_cost_억원, 1),
+            "환자수": int(r.get("patient_cnt") or 0),
+            "1인당(만원)": round(cpp_만원, 1),
+        })
+
+    return pd.DataFrame(data)
 
 # =========================================================
 # PDF generation (Chromium via Playwright)
@@ -573,20 +658,17 @@ age_group = AGE_GROUP_MAP.get(age_band, "50_59")
 sex = "M" if gender == "남성" else "F"
 
 try:
-    top_rows = fetch_top_cards(
-        start_year=int(start_year),
-        end_year=int(end_year),
-        age_group=age_group,
-        sex=sex,
-        sort_key=sort_key,
-        limit=7,
-    )
+    top_rows = fetch_top_rows(start_year, end_year, age_group, sex, sort_key=sort_key, limit=7)
 except Exception as e:
     st.error(f"D1 통계 조회 실패: {e}")
     top_rows = []
 
 chart_title = f"Top7 질병 통계 ({start_year}~{end_year} · {age_band} · {sex} · 기준: {sort_label})"
-chart_data_uri = build_top7_combo_chart_data_uri(top_rows, chart_title)
+chart_data_uri = build_top7_combo_chart_data_uri(
+    top_rows,
+    title=chart_title,
+    basis=sort_key,  # ✅ 막대=기준 스위칭의 입력
+)
 
 st.markdown("#### 통계 미리보기 (차트)")
 
@@ -596,17 +678,30 @@ if chart_data_uri:
 else:
     st.warning("차트를 만들 데이터가 없습니다. 조건을 바꿔보세요.")
 
-# (선택) 차트 아래 표도 같이 두면 문구 수정이 더 쉬움
-with st.expander("통계 상세(Top7 테이블)"):
-    st.table([
-        {
-            "질병": r.get("disease_name_ko") or r.get("disease_code"),
-            "총진료비": int(r.get("total_cost") or 0),
-            "환자수": int(r.get("patient_cnt") or 0),
-            "1인당": float(r.get("cost_per_patient") or 0),
-        }
-        for r in top_rows
-    ])
+def krw_to_eok(n: float | int) -> float:
+    """천원 → 억원"""
+    return round((float(n or 0) * 1_000) / 1e8, 2)
+
+def krw_to_man(n: float | int) -> float:
+    """천원 → 만원"""
+    return round((float(n or 0) * 1_000) / 1e4, 1)
+
+
+with st.expander("통계 상세 (Top7 테이블)"):
+    st.dataframe(
+        [
+            {
+                "질병코드": r.get("disease_code"),
+                "질병명": r.get("disease_name_ko") or r.get("disease_code"),
+                "총진료비(억원)": krw_to_eok(r.get("total_cost")),
+                "환자수(명)": int(r.get("patient_cnt") or 0),
+                "1인당 진료비(만원)": krw_to_man(r.get("cost_per_patient")),
+            }
+            for r in top_rows
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 st.subheader("문구 조정(선택/제한)")
