@@ -151,6 +151,13 @@ def d1_query(sql: str, params: list) -> list[dict]:
         return []
     return blocks[0].get("results", [])
 
+@st.cache_data(show_spinner=False, ttl=3600)
+def fetch_year_range() -> tuple[int, int]:
+    row = d1_query("SELECT MIN(year) AS min_year, MAX(year) AS max_year FROM disease_year_age_sex_metrics;", [])
+    if not row:
+        return (2010, 2024)  # fallback
+    return (int(row[0].get("min_year") or 2010), int(row[0].get("max_year") or 2024))
+
 
 # =========================================================
 # Stats helpers (Top N)
@@ -170,25 +177,23 @@ STAT_SORT_OPTIONS = {
     "1인당 진료비": {"key": "cost_per_patient", "label": "1인당"},
 }
 
-
 @st.cache_data(show_spinner=False, ttl=3600)
 def fetch_top_cards(
-    year: int,
+    start_year: int,
+    end_year: int,
     age_group: str,
     sex: str,
     sort_key: str = "total_cost",
     limit: int = 7,
 ) -> list[dict]:
     """
-    동일 연도/연령/성별에서 sort_key 기준 상위 N개 질병 카드 생성
+    기간(start_year~end_year) + 연령/성별에서 sort_key 기준 상위 N개 질병 카드 생성
     disease 테이블 조인해서 disease_name_ko 표시
     sort_key: total_cost | patient_cnt | cost_per_patient
     """
-    # 안전장치: 예상 키만 허용
     if sort_key not in ("total_cost", "patient_cnt", "cost_per_patient"):
         sort_key = "total_cost"
 
-    # NOTE: ORDER BY는 파라미터 바인딩이 불가하므로 whitelist 방식으로 문자열 삽입
     order_by = {
         "total_cost": "total_cost DESC",
         "patient_cnt": "patient_cnt DESC",
@@ -206,7 +211,7 @@ def fetch_top_cards(
       FROM disease_year_age_sex_metrics m
       LEFT JOIN disease d
         ON m.disease_code = d.disease_code
-      WHERE m.year = ?
+      WHERE m.year BETWEEN ? AND ?
         AND m.age_group = ?
         AND m.sex = ?
       GROUP BY m.disease_code, COALESCE(NULLIF(TRIM(d.disease_name_ko), ''), m.disease_code)
@@ -216,7 +221,7 @@ def fetch_top_cards(
     LIMIT ?;
     """
 
-    rows = d1_query(sql, [year, age_group, sex, int(limit)])
+    rows = d1_query(sql, [int(start_year), int(end_year), age_group, sex, int(limit)])
 
     cards: list[dict] = []
     for r in rows:
@@ -225,7 +230,6 @@ def fetch_top_cards(
         total_cost = float(r.get("total_cost") or 0)
         cpp = float(r.get("cost_per_patient") or 0)
 
-        # 기준이 선택되었으니, 카드 value에서 "기준 지표를 앞에" 노출
         if sort_key == "total_cost":
             lead = f"연간 진료비 {format_krw_compact(total_cost)}"
         elif sort_key == "patient_cnt":
@@ -417,9 +421,18 @@ if not segment:
     st.stop()
 
 # ---------------------------------------------------------
-# 통계 옵션(Top7 기준 선택)
+# 통계 표시 옵션 (Top7 기준 + 기간)
 # ---------------------------------------------------------
 st.subheader("통계 표시 옵션")
+
+min_year, max_year = fetch_year_range()
+
+STAT_SORT_OPTIONS = {
+    "총 진료비(기간합)": {"key": "total_cost"},
+    "환자수(기간합)": {"key": "patient_cnt"},
+    "1인당 진료비(기간평균)": {"key": "cost_per_patient"},
+}
+
 sort_label = st.radio(
     "Top7 기준",
     options=list(STAT_SORT_OPTIONS.keys()),
@@ -428,8 +441,35 @@ sort_label = st.radio(
 )
 sort_key = STAT_SORT_OPTIONS[sort_label]["key"]
 
+# 기본: 최신년도 1년
+default_end = max_year
+default_start = max_year
+
+colA, colB = st.columns(2)
+with colA:
+    start_year = st.number_input(
+        "시작년도",
+        min_value=int(min_year),
+        max_value=int(max_year),
+        value=int(default_start),
+        step=1,
+    )
+with colB:
+    end_year = st.number_input(
+        "종료년도",
+        min_value=int(min_year),
+        max_value=int(max_year),
+        value=int(default_end),
+        step=1,
+    )
+
+# start > end 방지 (자동 보정)
+if start_year > end_year:
+    start_year, end_year = end_year, start_year
+    st.info(f"시작/종료년도를 자동 보정했습니다: {start_year} ~ {end_year}")
+
 # ---------------------------------------------------------
-# D1 기반 통계 카드 구성 (Top7)
+# D1 기반 통계 미리보기 (리포트 미리보기 전에 먼저 노출)
 # ---------------------------------------------------------
 AGE_GROUP_MAP = {
     "20대": "20_29",
@@ -440,13 +480,28 @@ AGE_GROUP_MAP = {
 }
 age_group = AGE_GROUP_MAP.get(age_band, "50_59")
 sex = "M" if gender == "남성" else "F"
-year = int(stats_db.get("base_year", 2024))
 
 try:
-    cards = fetch_top_cards(year, age_group, sex, sort_key=sort_key, limit=7)
+    cards = fetch_top_cards(
+        start_year=int(start_year),
+        end_year=int(end_year),
+        age_group=age_group,
+        sex=sex,
+        sort_key=sort_key,
+        limit=7,
+    )
 except Exception as e:
     st.error(f"D1 통계 조회 실패: {e}")
     cards = []
+
+st.caption(f"통계 범위: {start_year}~{end_year} · 연령: {age_band}({age_group}) · 성별: {sex} · 기준: {sort_label}")
+
+# 통계 “먼저” 보여주기 (표 형태)
+if cards:
+    st.markdown("#### 통계 미리보기 (Top7)")
+    st.table([{"질병": c["title"], "요약": c["value"]} for c in cards])
+else:
+    st.warning("통계 데이터가 없습니다. (조건을 바꿔보세요)")
 
 
 st.subheader("문구 조정(선택/제한)")
@@ -494,10 +549,10 @@ context = {
         "cta": cta_text,
     },
     "stats": {
-        "base_year": str(year),
+        "base_year": f"{start_year}~{end_year}",
         "source": stats_db.get("source", "공식 보건의료 통계(요약)"),
         "cards": cards,
-        "top7_basis": sort_label,  # 템플릿에 표기하고 싶으면 사용
+        "top7_basis": sort_label,
     },
     "structure_rows": structure_rows,
     "footer": stats_db.get(
