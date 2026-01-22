@@ -618,3 +618,9 @@ html, body{
   line-height: 1.45;
   margin-top: 4px;
 }
+
+.meta-oneline {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
