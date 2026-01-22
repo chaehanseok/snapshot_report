@@ -522,7 +522,7 @@ html, body{
 }
 
 /* 2페이지 차트는 컴팩트 유지 */
-.page:nth-of-type(2) .stats-chart {
+.page:nth-of-type(3) .stats-chart {
   max-height: 340px;
 }
 
