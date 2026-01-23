@@ -943,19 +943,19 @@ st.markdown("---")
 # =========================================================
 # 문구 커스터마이징 + HTML/PDF 미리보기/출력
 # =========================================================
-st.subheader("문구 조정(표준 문구를 커스터마이징 가능합니다.)")
-summary_lines = segment["summary_lines"][:]
-gap_questions = segment["gap_questions"][:]
-cta_text = segment["cta"]
+# st.subheader("문구 조정(표준 문구를 커스터마이징 가능합니다.)")
+# summary_lines = segment["summary_lines"][:]
+# gap_questions = segment["gap_questions"][:]
+# cta_text = segment["cta"]
 
-summary_lines[0] = st.text_input("요약 1", value=summary_lines[0])
-summary_lines[1] = st.text_input("요약 2", value=summary_lines[1])
-summary_lines[2] = st.text_input("요약 3", value=summary_lines[2])
+# summary_lines[0] = st.text_input("요약 1", value=summary_lines[0])
+# summary_lines[1] = st.text_input("요약 2", value=summary_lines[1])
+# summary_lines[2] = st.text_input("요약 3", value=summary_lines[2])
 
-gap_questions[0] = st.text_input("점검 질문 1", value=gap_questions[0])
-gap_questions[1] = st.text_input("점검 질문 2", value=gap_questions[1])
+# gap_questions[0] = st.text_input("점검 질문 1", value=gap_questions[0])
+# gap_questions[1] = st.text_input("점검 질문 2", value=gap_questions[1])
 
-cta_text = st.text_area("CTA 문구", value=cta_text, height=90)
+# cta_text = st.text_area("CTA 문구", value=cta_text, height=90)
 
 structure_rows = [
     {"area": "진단비", "reason": "진단 직후 초기 자금 여력(목돈) 점검"},
@@ -992,9 +992,12 @@ context = {
         "headline": segment["headline"].replace(
             "{customer_name}", (customer_name.strip() or "고객")
         ),
-        "summary_lines": summary_lines,
-        "gap_questions": gap_questions,
-        "cta": cta_text,
+        # "summary_lines": summary_lines,
+        # "gap_questions": gap_questions,
+        # "cta": cta_text,
+        "summary_lines": segment["summary_lines"],
+        "gap_questions": segment["gap_questions"],
+        "cta": segment["cta"],
     },
 
     # =========================
