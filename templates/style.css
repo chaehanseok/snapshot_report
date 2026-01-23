@@ -58,6 +58,7 @@ html, body{
 
 .page:last-child{
   page-break-after:auto;
+  position: relative;   /* 🔑 이 한 줄이 핵심 */
 }
 
 .page-break{
@@ -537,18 +538,21 @@ html, body{
   white-space:nowrap;
 }
 
-.compliance-footer,
-.compliance-code {
-  font-size: 10px;          /* footer와 동일 */
+/* 기본 화면 */
+.page2-footer {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid #e5e7eb;
+
+  font-size: 10px;
   line-height: 1.4;
   color: #6b7280;
   text-align: left;
-  margin-top: 6px;
 }
 
-/* print 위치 고정 */
+/* PDF 전용: 반드시 페이지 하단 */
 @media print {
-  .compliance-footer {
+  .page:last-of-type .page2-footer {
     position: absolute;
     bottom: 10mm;
     left: 20mm;
