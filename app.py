@@ -50,7 +50,6 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 CONTENT_DIR = BASE_DIR / "content" / "v1"
 
 SEGMENTS_PATH = CONTENT_DIR / "segments.json"
-STATS_PATH = CONTENT_DIR / "stats_phrases.json"
 CSS_PATH = TEMPLATES_DIR / "style.css"
 HTML_TEMPLATE = "pamphlet_v1.html"
 
@@ -746,7 +745,6 @@ except Exception as e:
     st.stop()
 
 segments_db = load_json(SEGMENTS_PATH)
-stats_db = load_json(STATS_PATH)
 
 planner_org_display = org_display(BRAND_NAME, planner.get("org", ""))
 planner_phone_display = format_phone_3_4_4(planner["phone"])
@@ -963,6 +961,19 @@ structure_rows = [
     {"area": "생활·소득", "reason": "치료로 인한 소득 공백·가계 영향 점검"},
 ]
 
+# =========================================================
+# Fixed Legal Footer (Compliance Approved)
+# =========================================================
+
+LEGAL_FOOTER = {
+    "disclaimer": (
+        "본 자료는 동일 연령·성별 집단의 통계 기반 참고 자료이며, "
+        "개인별 진단·보장 수준은 상이할 수 있습니다. "
+        "정확한 확인은 종합 보장분석을 통해 가능합니다."
+    ),
+    "legal_note": "본 자료는 편의를 위해 제공되며 법적 효력을 갖지 않습니다.",
+}
+
 logo_data_uri = file_to_data_uri(LOGO_PATH, "image/png")
 
 context = {
@@ -1032,17 +1043,7 @@ context = {
 
     "structure_rows": structure_rows,
 
-    "footer": stats_db.get(
-        "footer",
-        {
-            "disclaimer": (
-                "본 자료는 동일 연령·성별 집단의 통계 기반 참고 자료이며, "
-                "개인별 진단·보장 수준은 상이할 수 있습니다. "
-                "정확한 확인은 종합 보장분석을 통해 가능합니다."
-            ),
-            "legal_note": "본 자료는 편의를 위해 제공되며 법적 효력을 갖지 않습니다.",
-        },
-    ),
+    "footer": LEGAL_FOOTER,
 }
 
 
