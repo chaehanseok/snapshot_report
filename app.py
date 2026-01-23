@@ -268,8 +268,12 @@ def build_top10_combo_chart_data_uri(
 
     for r in rows:
         code = (r.get("disease_code") or "").strip()
-        name = (r.get("disease_name_ko") or "").strip() or code or "질병"
-        labels.append(f"{name} ({code})" if code else name)
+        name_raw = (r.get("disease_name_ko") or "").strip() or code or "질병"
+
+        # ⭐ 여기서 표시용 truncate 적용
+        name_display = truncate_korean(name_raw, 15)
+
+        labels.append(f"{name_display} ({code})" if code else name_display)
 
         total_cost_chewon = float(r.get("total_cost") or 0)
         prevalence = float(r.get("prevalence_per_100k") or 0)
@@ -410,6 +414,11 @@ def render_emerging_table_html(rows: list[dict]) -> str:
 
     html += "</tbody></table>"
     return html
+
+def truncate_korean(text: str, max_len: int = 15) -> str:
+    if not text:
+        return text
+    return text if len(text) <= max_len else text[:max_len] + "..."
 
 
 # =========================================================
