@@ -119,11 +119,14 @@ html, body{
 @media print {
   .compliance-footer {
     position: absolute;
-    bottom: 12mm;
+    bottom: 8mm;        /* 10mm → 8mm (조금 더 위로) */
     left: 20mm;
     right: 20mm;
-    font-size: 9.5px;
-    color: #666;
+
+    font-size: 10px;
+    line-height: 1.4;
+    color: #6b7280;
+    text-align: left;
   }
 }
 
@@ -231,6 +234,18 @@ html, body{
 .section{
   margin-top:14px;
 }
+
+/* Page 2에서만 섹션 여백 축소 */
+.page:nth-of-type(3) .section {
+  margin-top: 8px;      /* 기존 14px → 8px */
+  position: relative;   /* absolute footer 기준점 */
+}
+
+.page:nth-of-type(3) .section.emerging {
+  margin-top: 4px;
+  padding: 6px 10px;
+}
+
 
 .section-title{
   display:flex;
