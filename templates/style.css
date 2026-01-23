@@ -91,6 +91,41 @@ html, body{
   }
 }
 
+@media print {
+  .emerging-table {
+    font-size: 11px;
+  }
+
+  .emerging-table table {
+    margin-top: 4px;
+  }
+
+  .emerging-table th,
+  .emerging-table td {
+    padding: 4px 6px;
+    line-height: 1.25;
+  }
+}
+
+@media print {
+  .emerging-section {
+    max-height: 260px;   /* ★ 여기서 실제로 조절 */
+    overflow: hidden;
+  }
+}
+
+@media print {
+  .compliance-footer {
+    position: absolute;
+    bottom: 12mm;
+    left: 20mm;
+    right: 20mm;
+    font-size: 9.5px;
+    color: #666;
+  }
+}
+
+
 /* =========================
    Top band
    ========================= */

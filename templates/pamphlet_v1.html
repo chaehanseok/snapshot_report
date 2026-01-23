@@ -125,13 +125,17 @@
     <!-- 신규 부각 -->
     {% if emerging_table %}
     <section class="section emerging compact">
+
       <h2 class="section-title">향후 새롭게 부각되는 질병</h2>
+      <div class="emerging-section emerging-table">
       {{ emerging_table | safe }}
-    </section>
+      </div>    
+
     <p class="note compact-note">
       * 현재 연령대에서는 상위 질병이 아니지만,
       향후 의료 이용이 빠르게 증가하는 질병입니다.
     </p>
+    </section>
     {% endif %}
 
     <!-- 점검 질문 -->
@@ -173,6 +177,11 @@
       <div class="footer__disclaimer">{{ footer.disclaimer }}</div>
       <div class="footer__legal">{{ footer.legal_note }}</div>
     </footer>
+
+    <div class="compliance-footer">
+    미래에셋금융서비스㈜ 준법감시인 2026-보장점검-{{ version }}-{{ issue_no }}
+    ({{ issue_date }} ~ {{ expiry_date }})
+    </div>
 
   </div>
   </div>
