@@ -538,21 +538,32 @@ html, body{
   white-space:nowrap;
 }
 
-/* 기본 화면 */
-.page2-footer {
-  margin-top: 10px;
-  padding-top: 6px;
-  border-top: 1px solid #e5e7eb;
+/* =========================
+   Footer (Page 2 unified)
+   ========================= */
+.footer--page2 {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
 
+.footer__disclaimer,
+.footer__legal,
+.footer__compliance {
   font-size: 10px;
-  line-height: 1.4;
-  color: #6b7280;
+  color: var(--muted);
+  line-height: 1.35;
   text-align: left;
 }
 
-/* PDF 전용: 반드시 페이지 하단 */
+/* 준법감시인 문구는 살짝만 띄움 */
+.footer__compliance {
+  margin-top: 6px;
+}
+
+/* print 위치 고정 – footer 전체를 기준으로 */
 @media print {
-  .page:last-of-type .page2-footer {
+  .footer--page2 {
     position: absolute;
     bottom: 10mm;
     left: 20mm;
