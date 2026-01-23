@@ -384,6 +384,32 @@ def build_top10_combo_chart_data_uri(
     return f"data:image/png;base64,{png_b64}"
 
 
+def render_emerging_table_html(rows: list[dict]) -> str:
+    if not rows:
+        return ""
+
+    headers = [
+        "질병명",
+        "총진료비(연평균, 억원)",
+        "1인당 진료비(만원)",
+    ]
+
+    html = '<table class="table-compact"><thead><tr>'
+    for h in headers:
+        html += f"<th>{h}</th>"
+    html += "</tr></thead><tbody>"
+
+    for r in rows:
+        html += "<tr>"
+        html += f"<td>{r.get('disease_name_ko') or r.get('disease_code')}</td>"
+        html += f"<td>{chewon_to_eok((float(r.get('total_cost') or 0) / years)):,.1f}</td>"
+        html += f"<td>{chewon_to_man(r.get('cost_per_patient')):,.0f}</td>"
+        html += "</tr>"
+
+    html += "</tbody></table>"
+    return html
+
+
 # =========================================================
 # Sort options / Age mapping
 # =========================================================
@@ -1045,7 +1071,7 @@ context = {
     # =========================
     "after_chart_data_uri": after_chart_uri if after_rows else None,
     "after_table": render_table_html(after_rows) if after_rows else "",
-    "emerging_table": render_table_html(emerging_rows) if emerging_rows else "",
+    "emerging_table": render_emerging_table_html(emerging_rows),
 
     "structure_rows": structure_rows,
 

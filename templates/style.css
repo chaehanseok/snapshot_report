@@ -412,3 +412,26 @@ html, body{
   color:var(--muted);
   line-height:1.35;
 }
+
+
+.table-compact {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.table-compact th,
+.table-compact td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table-compact th {
+  font-weight: 600;
+  background: #f8fafc;
+}
+
+.table-compact tbody tr:last-child td {
+  border-bottom: none;
+}
