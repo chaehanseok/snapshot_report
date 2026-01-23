@@ -71,6 +71,7 @@ html, body{
   .preview-viewport{
     max-width:1100px;
     margin:12px auto;
+    overflow-x: hidden; /* 🔑 좌우 스크롤 제거 */
   }
 
   .page{
@@ -81,6 +82,8 @@ html, body{
     width:794px;           /* 🔑 A4 실제 폭 (96dpi) */
     min-height:1120px;     /* 🔑 A4 높이 유지 */
     margin:0 auto;
+    transform: scale(0.9);          /* 필요시 0.85 ~ 0.95 조절 */
+    transform-origin: top center;   /* 위 기준 중앙 축소 */
   }
 }
 
