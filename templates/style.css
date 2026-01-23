@@ -73,15 +73,21 @@ html, body{
     margin:12px auto;
   }
 
+  /* 스케일 담당 */
+  .page-wrap{
+    display:flex;
+    justify-content:center;
+    transform: scale(0.95);           /* 여기서 축소 */
+    transform-origin: top center;
+  }
+
+  /* 실제 A4 페이지 */
   .page{
+    width:794px;
+    min-height:1120px;
     background:#fff;
     box-shadow:0 8px 24px rgba(0,0,0,0.08);
     border-radius:10px;
-
-    width:794px;           /* 🔑 A4 실제 폭 (96dpi) */
-    min-height:1120px;     /* 🔑 A4 높이 유지 */
-    margin:0 auto;
-    transform: scale(0.95);          /* 필요시 0.85 ~ 0.95 조절 */
   }
 }
 
