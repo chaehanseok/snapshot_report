@@ -103,6 +103,7 @@ def verify_token(token: str) -> Dict[str, Any]:
         "phone": phone_digits,
         "email": payload.get("email", None),
         "org": org,
+        "fc_code": payload.get("fc_code"),   # ✅ 추가
     }
 
 
@@ -773,6 +774,7 @@ if not token:
 
 try:
     planner = verify_token(token)
+    fc_code = planner["fc_code"]
 except Exception as e:
     st.error(f"접속 검증 실패: {e}")
     st.stop()
@@ -872,7 +874,7 @@ if chart_data_uri:
 else:
     st.warning("차트를 만들 데이터가 없습니다. 조건을 바꿔보세요.")
 
-with st.expander("통계 상세 (Top15 테이블) - 현재 연령대",expanded=True):
+with st.expander("통계 상세 (Top15 테이블) - 현재 연령대",expanded=False):
     st.dataframe(
         [
             {
@@ -922,7 +924,7 @@ if after_groups and after_rows:
     )
     st.image(base64.b64decode(after_chart_uri.split(",", 1)[1]))
 
-    with st.expander("통계 상세 (Top15 테이블) - 이후 연령대 합산",expanded=True):
+    with st.expander("통계 상세 (Top15 테이블) - 이후 연령대 합산",expanded=False):
         st.dataframe(
             [
                 {
