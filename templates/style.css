@@ -71,7 +71,6 @@ html, body{
   .preview-viewport{
     max-width:1100px;
     margin:12px auto;
-    overflow-x: hidden; /* 🔑 좌우 스크롤 제거 */
   }
 
   .page{
