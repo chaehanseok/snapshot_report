@@ -93,7 +93,7 @@ html, body{
 
 @media print {
   .emerging-table {
-    font-size: 11px;
+    font-size: 10.5px;
   }
 
   .emerging-table table {
@@ -103,7 +103,7 @@ html, body{
 
   .emerging-table th,
   .emerging-table td {
-    padding: 4px 6px;
+    padding: 3px 5px;
     line-height: 1.25;
   }
 }
@@ -112,6 +112,7 @@ html, body{
   .emerging-section {
     max-height: 260px;   /* ★ 여기서 실제로 조절 */
     overflow: hidden;
+    page-break-inside: avoid;   /* 🔑 이게 핵심 */
   }
 }
 
@@ -341,6 +342,18 @@ html, body{
   border-radius:8px;
 }
 
+/* 섹션 자체 여백 축소 */
+.section.emerging {
+  margin-top: 6px;              /* 기존 14px → 6px */
+  padding: 8px 12px;            /* 기존 10px 14px → 축소 */
+}
+
+/* 제목 위 여백 제거 */
+.section.emerging .section-title {
+  margin: 0 0 4px 0;            /* 🔑 위 여백 제거 */
+  font-size: 12px;
+}
+
 .section.emerging.compact {
   margin-top: 10px;
 }
@@ -494,11 +507,30 @@ html, body{
   align-items:baseline;
   justify-content:space-between;
   gap:12px;
-  margin-bottom:6px;
+  margin-bottom: 4px;   /* 기존 6px → 4px */
 }
 
 .section-header.inline .section-note{
   font-size:11px;
   color:#6b7280;
   white-space:nowrap;
+}
+
+.compliance-footer,
+.compliance-code {
+  font-size: 10px;          /* footer와 동일 */
+  line-height: 1.4;
+  color: #6b7280;
+  text-align: left;
+  margin-top: 6px;
+}
+
+/* print 위치 고정 */
+@media print {
+  .compliance-footer {
+    position: absolute;
+    bottom: 10mm;
+    left: 20mm;
+    right: 20mm;
+  }
 }
