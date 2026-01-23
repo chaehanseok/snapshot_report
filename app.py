@@ -164,6 +164,21 @@ def fetch_year_range() -> tuple[int, int]:
         return (2010, 2024)
     return (int(row[0].get("min_year") or 2010), int(row[0].get("max_year") or 2024))
 
+def get_today_issue_count() -> int:
+    """
+    오늘(created_at 기준, localtime) 발행된 pamphlet_issue 건수 조회
+    - 매일 00시 기준으로 reset되는 #### 시퀀스용
+    """
+    sql = """
+    SELECT COUNT(*) AS cnt
+    FROM pamphlet_issue
+    WHERE date(created_at) = date('now', 'localtime');
+    """
+    rows = d1_query(sql, [])
+    if not rows:
+        return 0
+    return int(rows[0].get("cnt", 0))
+
 
 # =========================================================
 # matplotlib font fix (Korean)
@@ -798,6 +813,8 @@ st.write(f"FC명 : **{planner['name']}**")
 st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
 st.divider()
+
+st.write("오늘 발행 건수:", get_today_issue_count())
 
 # -------------------------
 # 고객 기본 정보 (한 줄 정렬)
