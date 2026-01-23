@@ -585,6 +585,14 @@ html, body{
   margin-bottom: 4px;
 }
 
+/* 1페이지 stats-footer와 동일한 역할의 실선 */
+.official-divider{
+  height: 1px;
+  background: var(--border);
+  margin-bottom: 6px;
+}
+
+
 /* 텍스트 스타일 = footer와 동일 */
 .official-text{
   font-size: 10px;
