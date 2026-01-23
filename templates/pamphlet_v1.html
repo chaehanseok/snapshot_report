@@ -127,7 +127,7 @@
     <section class="section emerging compact">
 
       <h2 class="section-title">향후 새롭게 부각되는 질병</h2>
-      <div class="emerging-section emerging-table">
+      <div class="emerging-table">
       {{ emerging_table | safe }}
       </div>    
 
@@ -178,10 +178,11 @@
       <div class="footer__legal">{{ footer.legal_note }}</div>
     </footer>
 
-    <div class="compliance-footer">
-    미래에셋금융서비스㈜ 준법감시인 2026-보장점검-{{ version }}-{{ issue_no }}
-    ({{ issue_date }} ~ {{ expiry_date }})
-    </div>
+    <!-- PAGE 2 FOOTER : 준법감시인 -->
+    <footer class="page2-footer">
+      미래에셋금융서비스㈜ 준법감시인 심의필 : 심의번호 {{ compliance_code }}
+    </footer>
+
 
   </div>
   </div>

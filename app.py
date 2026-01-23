@@ -23,6 +23,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from matplotlib import font_manager as fm
+from datetime import date, timedelta
 
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
@@ -1008,6 +1009,9 @@ LEGAL_FOOTER = {
 
 logo_data_uri = file_to_data_uri(LOGO_PATH, "image/png")
 
+today = date.today()
+expire = today + timedelta(days=30)
+
 context = {
     "css_path": str(CSS_PATH),
     "logo_data_uri": logo_data_uri,
@@ -1078,6 +1082,11 @@ context = {
     "footer": LEGAL_FOOTER,
 }
 
+context["compliance_code"] = (
+    f"2026-보장점검-v{APP_VERSION}-"
+    f"(발행번호 예정) "
+    f"({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
+)
 
 final_html = build_final_html_for_both(context)
 

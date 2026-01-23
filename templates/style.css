@@ -98,6 +98,7 @@ html, body{
 
   .emerging-table table {
     margin-top: 4px;
+    font-size: 11px;
   }
 
   .emerging-table th,
@@ -340,10 +341,14 @@ html, body{
   border-radius:8px;
 }
 
+.section.emerging.compact {
+  margin-top: 10px;
+}
+
 .section.emerging.compact table{
   width:100%;
   border-collapse:collapse;
-  font-size:12px;
+  font-size:10px;
 }
 .section.emerging.compact th,
 .section.emerging.compact td{
@@ -360,7 +365,7 @@ html, body{
 }
 
 .compact-note{
-  font-size:11px;
+  font-size:10px;
   color:#666;
   margin:6px 0;
 }
@@ -469,4 +474,17 @@ html, body{
 
 .table-compact tbody tr:last-child td {
   border-bottom: none;
+}
+
+.page2-footer {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid #e5e7eb;
+
+  font-size: 10px;          /* 🔑 절대 고정 */
+  line-height: 1.4;
+  color: #6b7280;
+  text-align: center;
+
+  page-break-inside: avoid;
 }
