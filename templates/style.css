@@ -144,14 +144,28 @@ html, body{
   width:auto;
 }
 
-/* Page 2 : logo only */
+/* =========================
+   Header (logo-only, Page 2)
+   - Page padding 기준으로 정렬 통일
+   ========================= */
 .header--logo-only{
+  display:grid;
+  grid-template-columns: 1fr 200px;   /* 1페이지 header와 동일 */
+  gap:14px;
+  padding:10px 0 8px;                 /* 1페이지와 동일 */
+  border-bottom:1px solid var(--border);
+  margin-bottom:10px;
+}
+
+/* 왼쪽 영역은 숨김 (공간은 유지) */
+.header--logo-only .header-left{
+  visibility:hidden;
+}
+
+/* 로고 정렬은 기존 header와 동일 */
+.header--logo-only .header-right{
   display:flex;
   justify-content:flex-end;
-  padding:12px 0;
-}
-.header--logo-only .header-left{
-  display:none;
 }
 
 /* =========================
