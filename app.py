@@ -224,6 +224,7 @@ def build_top10_combo_chart_data_uri(
     basis: str,
     start_year: int,
     end_year: int,
+    compact: bool = False,   # ✅ 추가
 ) -> str:
     """
     Top15 콤보 차트 (막대 1 + 보조선 2) - 유병률 버전
@@ -301,11 +302,16 @@ def build_top10_combo_chart_data_uri(
         aux2 = ("연평균 총 진료비", cost_avg_eok, "억", MIRAE_BLUE, "bottom")
 
     plt.close("all")
-    fig, ax = plt.subplots(figsize=(12.5, 10.0), dpi=300)
+    if compact:
+        # 2페이지용 (차트 + 테이블 + 문구 공존)
+        fig, ax = plt.subplots(figsize=(12.5, 7.4), dpi=300)
+    else:
+        # 1페이지용 (차트 단독 중심)
+        fig, ax = plt.subplots(figsize=(12.5, 10.0), dpi=300)
 
     ax.barh(y, bar_vals)
     ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=11.5)
+    ax.set_yticklabels(labels, fontsize=13)
 
     ax.set_xlabel("")
     ax.tick_params(axis="x", bottom=False, labelbottom=False)
@@ -334,8 +340,8 @@ def build_top10_combo_chart_data_uri(
     ax_top.spines["bottom"].set_visible(False)
     ax_bottom.spines["top"].set_visible(False)
 
-    ax_top.tick_params(axis="x", top=True, labeltop=True, direction="out", pad=2)
-    ax_bottom.tick_params(axis="x", bottom=True, labelbottom=True, direction="out", pad=2)
+    ax_top.tick_params(axis="x", top=True, labeltop=True, direction="out", pad=2, labelsize=11)
+    ax_bottom.tick_params(axis="x", bottom=True, labelbottom=True, direction="out", pad=2, labelsize=11)
 
     aux_top = aux1 if aux1[4] == "top" else aux2
     aux_bot = aux2 if aux2[4] == "bottom" else aux1
@@ -351,8 +357,8 @@ def build_top10_combo_chart_data_uri(
     ax_top.xaxis.set_major_formatter(fmt_axis(top_unit))
     ax_bottom.xaxis.set_major_formatter(fmt_axis(bot_unit))
 
-    ax_top.xaxis.label.set_size(11)
-    ax_bottom.xaxis.label.set_size(11)
+    ax_top.xaxis.label.set_size(12)
+    ax_bottom.xaxis.label.set_size(12)
 
     h_top, = ax_top.plot(top_vals, y, marker="o", linewidth=2.4, color=top_color, label=f"{top_label}({top_unit.strip()})")
     h_bot, = ax_bottom.plot(bot_vals, y, marker="o", linewidth=2.4, color=bot_color, label=f"{bot_label}({bot_unit.strip()})")
@@ -364,9 +370,9 @@ def build_top10_combo_chart_data_uri(
         main_txt = f"{bar_vals[i]:,.1f}{main_unit}"
         top_txt = f"{top_vals[i]:,.1f}{top_unit.strip()}"
         bot_txt = f"{bot_vals[i]:,.1f}{bot_unit.strip()}"
-        ax.text(bar_vals[i], i, f"  {main_txt} ({top_txt} · {bot_txt})", va="center", fontsize=11)
+        ax.text(bar_vals[i], i, f"  {main_txt} ({top_txt} · {bot_txt})", va="center", fontsize=12.5)
 
-    fig.suptitle(title, fontsize=14, fontweight="bold")
+    fig.suptitle(title, fontsize=16, fontweight="bold")
     ax.legend(handles=[h_top, h_bot], loc="lower right", frameon=True,fontsize=10.5)
 
     fig.tight_layout(rect=[0, 0.02, 1, 0.95])
@@ -885,7 +891,7 @@ if after_groups and after_rows:
     after_title = f"이후 연령대 합산 통계 ({next_age_label} · {sex_display} · 기준: {sort_label})"
     after_chart_uri = build_top10_combo_chart_data_uri(
         after_rows, title=after_title, basis=sort_key,
-        start_year=int(start_year), end_year=int(end_year),
+        start_year=int(start_year), end_year=int(end_year),compact=True,   # ⭐ 이게 핵심
     )
     st.image(base64.b64decode(after_chart_uri.split(",", 1)[1]))
 
