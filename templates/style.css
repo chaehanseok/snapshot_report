@@ -570,3 +570,35 @@ html, body{
     right: 20mm;
   }
 }
+
+/* 공식 하단 영역 */
+.official-footer{
+  margin-top: 8px;
+  padding-top: 6px;
+  page-break-inside: avoid;
+}
+
+/* planner-header 기준선과 동일 */
+.official-line{
+  height: 1px;
+  background: var(--border);
+  margin-bottom: 4px;
+}
+
+/* 텍스트 스타일 = footer와 동일 */
+.official-text{
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-align: left;
+}
+
+/* 인쇄 시 2페이지 하단 고정 */
+@media print{
+  .official-footer{
+    position: absolute;
+    bottom: 10mm;
+    left: 48px;   /* .page padding과 동일 */
+    right: 48px;
+  }
+}
