@@ -971,7 +971,7 @@ context = {
     "brand_name": BRAND_NAME,
     "brand_subtitle": BRAND_SUBTITLE,
     "version": APP_VERSION,
-
+    "after_section_title": f"{next_age_label} 연령대 통계 (미래 위험)",
     "customer": {
         "name": customer_name.strip() or "고객",
         "gender": gender,
