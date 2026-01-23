@@ -861,9 +861,10 @@ with st.expander("통계 상세 (Top15 테이블) - 현재 연령대",expanded=T
 # -------------------------
 # 이후 연령대(미래 위험)
 # -------------------------
-st.markdown(f"#### {next_age_label} 이후 연령대 통계 (미래 위험)")
+
 after_groups = AFTER_AGE_GROUPS.get(age_band, [])
 next_age_label = next_age_band_label(age_band)
+st.markdown(f"#### {next_age_label} 이후 연령대 통계 (미래 위험)")
 
 if not after_groups:
     st.info("선택한 연령대 이후의 통계가 존재하지 않습니다.")
