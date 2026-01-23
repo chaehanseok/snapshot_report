@@ -484,7 +484,21 @@ html, body{
   font-size: 10px;          /* 🔑 절대 고정 */
   line-height: 1.4;
   color: #6b7280;
-  text-align: center;
+  text-align: left;
 
   page-break-inside: avoid;
+}
+
+.section-header.inline{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:6px;
+}
+
+.section-header.inline .section-note{
+  font-size:11px;
+  color:#6b7280;
+  white-space:nowrap;
 }
