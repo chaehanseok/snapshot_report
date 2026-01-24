@@ -1311,12 +1311,6 @@ context = {
     "footer": LEGAL_FOOTER,
 }
 
-context["compliance_code"] = (
-    f"2026-보장점검-v{APP_VERSION}-"
-    f"(발행번호 예정) "
-    f"({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
-)
-
 final_html = build_final_html_for_both(context)
 
 st.subheader("미리보기")
@@ -1330,13 +1324,48 @@ if st.button("확정 후 PDF 생성"):
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
 
+    # 1️⃣ 발행번호 생성 (이 시점이 유일)
+    compliance_code = generate_compliance_code(
+        service_name="보장점검",
+        version=APP_VERSION,
+    )
+
+
     context["customer"]["name"] = customer_name.strip()
     context["segment"]["headline"] = segment["headline"].replace("{customer_name}", customer_name.strip())
+
+    context["compliance_code"] = (
+        f"{compliance_code} "
+        f"({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
+    )
+
     final_html = build_final_html_for_both(context)
 
     try:
         pdf_bytes = chromium_pdf_bytes(final_html)
+
+        # 3️⃣ 공식 발행 (R2 + D1)
+        publish_report(
+            pdf_bytes=pdf_bytes,
+            compliance_code=compliance_code,
+            segments_version=APP_VERSION,
+            fc_id=planner["fc_code"],
+            fc_name=planner["name"],
+            customer_name=customer_name.strip(),
+            customer_gender=gender,
+            customer_age_band=age_band,
+            start_year=start_year,
+            end_year=end_year,
+            sort_key=sort_key,
+            min_prev_100k=min_prev_100k,
+            min_cpp_manwon=min_cpp_manwon,
+        )
+
+        st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
+
         filename = f"보장점검안내_{customer_name.strip()}_{age_band}_{gender}.pdf"
+
         st.download_button("PDF 다운로드", data=pdf_bytes, file_name=filename, mime="application/pdf")
+        
     except Exception as e:
         st.error(f"PDF 생성(Playwright) 중 오류가 발생했습니다.\n\n오류: {e}")
