@@ -148,6 +148,12 @@ def d1_query(sql: str, params: list) -> list[dict]:
     payload = {"sql": sql, "params": params}
 
     r = requests.post(url, headers=headers, json=payload, timeout=30)
+
+    if not r.ok:
+        st.error("D1 ERROR RESPONSE:")
+        st.code(r.text)
+        r.raise_for_status()
+
     r.raise_for_status()
     data = r.json()
 
@@ -1366,6 +1372,6 @@ if st.button("확정 후 PDF 생성"):
         filename = f"보장점검안내_{customer_name.strip()}_{age_band}_{gender}.pdf"
 
         st.download_button("PDF 다운로드", data=pdf_bytes, file_name=filename, mime="application/pdf")
-        
+
     except Exception as e:
         st.error(f"PDF 생성(Playwright) 중 오류가 발생했습니다.\n\n오류: {e}")
