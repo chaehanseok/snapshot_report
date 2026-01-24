@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 import requests
 import zipfile
 from io import BytesIO
+from utils.auth import verify_token
 
 # =================================================
 # D1 Query Helper

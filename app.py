@@ -28,6 +28,9 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import boto3
 import copy
+from utils.r2 import generate_presigned_pdf_url
+from utils.auth import verify_token
+
 
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
@@ -74,41 +77,6 @@ SECRET = st.secrets.get("GATEWAY_SECRET", "")
 def b64url_decode(s: str) -> bytes:
     s += "=" * (-len(s) % 4)
     return base64.urlsafe_b64decode(s.encode("utf-8"))
-
-
-def verify_token(token: str) -> Dict[str, Any]:
-    if not SECRET:
-        raise ValueError("GATEWAY_SECRET not configured in Streamlit secrets.")
-
-    payload_b64, sig_b64 = token.split(".", 1)
-    payload_raw = b64url_decode(payload_b64)
-    sig = b64url_decode(sig_b64)
-
-    expected = hmac.new(SECRET.encode("utf-8"), payload_raw, hashlib.sha256).digest()
-    if not hmac.compare_digest(sig, expected):
-        raise ValueError("Invalid signature")
-
-    payload = json.loads(payload_raw.decode("utf-8"))
-    now = int(time.time())
-    exp = int(payload.get("exp", 0))
-    if now > exp:
-        raise ValueError("Token expired")
-
-    name = str(payload.get("name", "")).strip()
-    phone = str(payload.get("phone", "")).strip()
-    if not name or not phone:
-        raise ValueError("Missing planner fields")
-
-    phone_digits = re.sub(r"\D", "", phone)
-    org = str(payload.get("org", "")).strip()
-
-    return {
-        "name": name,
-        "phone": phone_digits,
-        "email": payload.get("email", None),
-        "org": org,
-        "fc_code": payload.get("fc_code"),   # ✅ 추가
-    }
 
 
 # =========================================================
@@ -421,22 +389,6 @@ def get_next_daily_seq() -> int:
 
     rows = d1_query(sql, [today])
     return int(rows[0]["seq"])
-
-def generate_presigned_pdf_url(r2_key: str, expires: int = 300) -> str:
-    """
-    R2 Private Object에 대한 임시 접근 URL 생성
-    - expires: 초 단위 (기본 5분)
-    """
-    r2 = get_r2_client()
-    return r2.generate_presigned_url(
-        "get_object",
-        Params={
-            "Bucket": st.secrets["R2_BUCKET_NAME"],
-            "Key": r2_key,
-        },
-        ExpiresIn=expires,
-    )
-
 
 # =========================================================
 # Chart (Top15 combo: bar 1 + line 2)  [유병률 기반]

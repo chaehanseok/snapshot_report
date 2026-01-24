@@ -2,8 +2,8 @@ import streamlit as st
 import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from app import verify_token
-from app import generate_presigned_pdf_url
+from utils.r2 import generate_presigned_pdf_url
+from utils.auth import verify_token
 
 # =================================================
 # Page Config (⚠️ 반드시 최상단)

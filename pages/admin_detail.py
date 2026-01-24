@@ -2,7 +2,8 @@ import streamlit as st
 import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from app import generate_presigned_pdf_url
+from utils.r2 import generate_presigned_pdf_url
+
 
 # =================================================
 # D1 Query Helper
