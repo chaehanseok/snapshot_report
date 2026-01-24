@@ -322,33 +322,14 @@ def generate_compliance_code(
     service_name: str,
     version: str,
 ) -> str:
-    """
-    준법감시 심의번호 생성
-    형식: YYYY-서비스명-vX.Y.Z-MMDD####
-    - ####: KST 기준 일자별 발행 시퀀스 (1부터, 매일 reset)
-    """
-
-    # 1️⃣ KST 기준 현재 시각
     now_kst = datetime.now(ZoneInfo("Asia/Seoul"))
-
     year = now_kst.strftime("%Y")
     mmdd = now_kst.strftime("%m%d")
 
-    # 2️⃣ 오늘 발행 건수 조회 (KST 기준)
-    today_count = get_today_report_issue_count()
-
-    # 3️⃣ 시퀀스 (####)
-    seq = today_count + 1
+    seq = get_next_daily_seq()      # ⭐ 여기
     seq_str = f"{seq:04d}"
 
-    # 4️⃣ 최종 심의번호 조합
-    compliance_code = (
-        f"{year}-{service_name}-v{version}-{mmdd}{seq_str}"
-    )
-
-    return compliance_code
-
-import time
+    return f"{year}-{service_name}-v{version}-{mmdd}{seq_str}"
 
 def publish_report(
     *,
@@ -421,6 +402,24 @@ def publish_report(
 
     # 5번 다 실패
     raise RuntimeError(f"발행번호 생성 실패 (동시성 충돌): {last_error}")
+
+def get_next_daily_seq() -> int:
+    """
+    KST 기준 일자별 발행 시퀀스를 DB에서 원자적으로 증가시켜 반환
+    """
+    today = today_kst_date_str()  # 'YYYY-MM-DD'
+
+    sql = """
+    INSERT INTO daily_issue_seq (issue_date, seq)
+    VALUES (?, 1)
+    ON CONFLICT(issue_date)
+    DO UPDATE SET seq = seq + 1
+    RETURNING seq;
+    """
+
+    rows = d1_query(sql, [today])
+    return int(rows[0]["seq"])
+
 
 
 # =========================================================
@@ -1316,6 +1315,9 @@ components.html(final_html, height=900, scrolling=True)
 
 st.divider()
 st.subheader("확정 및 PDF 출력")
+
+st.write("NEXT SEQ:", get_next_daily_seq())
+
 
 if st.button("확정 후 PDF 생성"):
     if not customer_name.strip():
