@@ -90,13 +90,30 @@ st.set_page_config(
     layout="wide",
 )
 
+st.title("🛠 관리자 페이지")
+st.caption("관리자 전용 발행 관리 화면입니다.")
+
+# 🔹 token 사전 체크
+token = st.query_params.get("token")
+
+if not token:
+    st.warning("관리자 토큰이 필요합니다.")
+    st.info("정상적인 관리자 링크로 접속해 주세요.")
+    st.stop()
+
+# 🔹 여기부터 진짜 인증
+if isinstance(token, list):
+    token = token[0]    
+
 admin = verify_admin()
 
-st.title("📊 발행 관리 대시보드")
-st.caption("보장점검 리포트 발행 현황 관리")
 
 kst_now = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
 st.caption(f"기준 시각(KST): {kst_now}")
+
+if admin.get("role") != "admin":
+    st.error("관리자 권한이 없습니다.")
+    st.stop()
 
 st.divider()
 
