@@ -106,7 +106,7 @@ for r in rows:
     pdf_url = generate_presigned_pdf_url(r2_key=r["pdf_r2_key"])
 
     with st.container(border=True):
-        c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 1, 2, 1.2, 1])
+        c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 1, 2, 1.2, 1.2])
 
         c1.markdown(f"**{r['compliance_code']}**")
         c2.write(r["customer_name"] or "-")
@@ -121,7 +121,7 @@ for r in rows:
                 use_container_width=True,
             )
 
-            # view 이벤트 기록
+            # view 로그 (1회만 찍고 싶으면 조건 추가 가능)
             d1_query(
                 """
                 INSERT INTO report_issue_event
@@ -131,24 +131,21 @@ for r in rows:
                 [r["compliance_code"], fc["fc_code"]],
             )
 
-        # ⬇ 다운로드
+        # ⬇ 다운로드 (⭐ 핵심)
         with c6:
-            if st.button("⬇ 다운로드", key=f"dl_{r['compliance_code']}"):
-                pdf_bytes = requests.get(pdf_url, timeout=30).content
-
-                d1_query(
+            st.download_button(
+                label="⬇ 다운로드",
+                data=requests.get(pdf_url, timeout=30).content,
+                file_name=r["pdf_filename"],
+                mime="application/pdf",
+                use_container_width=True,
+                key=f"dl_{r['compliance_code']}",
+                on_click=lambda code=r["compliance_code"]: d1_query(
                     """
                     INSERT INTO report_issue_event
                     (compliance_code, event_type, actor_type, actor_id)
                     VALUES (?, 'download', 'fc', ?);
                     """,
-                    [r["compliance_code"], fc["fc_code"]],
-                )
-
-                st.download_button(
-                    label="파일 저장",
-                    data=pdf_bytes,
-                    file_name=r["pdf_filename"],
-                    mime="application/pdf",
-                    key=f"dl_btn_{r['compliance_code']}",
-                )
+                    [code, fc["fc_code"]],
+                ),
+            )
