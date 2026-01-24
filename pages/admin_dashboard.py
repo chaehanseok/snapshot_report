@@ -53,11 +53,15 @@ st.divider()
 # D1 Query Helper
 # =================================================
 def d1_query(sql: str, params: list):
+    st.write("🔎 D1 query start")
     url = (
         f"https://api.cloudflare.com/client/v4/accounts/"
         f"{st.secrets['CF_ACCOUNT_ID']}/d1/database/"
         f"{st.secrets['D1_DATABASE_ID']}/query"
     )
+
+    st.write("URL:", url)
+    st.write("PARAMS:", params)
     headers = {
         "Authorization": f"Bearer {st.secrets['CF_API_TOKEN']}",
         "Content-Type": "application/json",
@@ -68,6 +72,8 @@ def d1_query(sql: str, params: list):
         json={"sql": sql, "params": params},
         timeout=30,
     )
+    st.write("STATUS:", r.status_code)
+    st.write("TEXT:", r.text)
     r.raise_for_status()
     data = r.json()
     return data["result"][0]["results"] if data.get("result") else []
@@ -86,10 +92,10 @@ SELECT
   MAX(created_at) AS last_issue_at
 FROM report_issue;
 """
-kpi = d1_query(sql_kpi, [])
+# kpi = d1_query(sql_kpi, [])
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("📄 전체 발행 수", f"{kpi[0]['total_cnt']:,}")
-c2.metric("👤 참여 FC 수", f"{kpi[0]['fc_cnt']:,}")
-c3.metric("🗓 오늘 발행", f"{kpi[0]['today_cnt']:,}")
-c4.metric("⏱ 최근 발행", kpi[0]["last_issue_at"][:16])
+# c1, c2, c3, c4 = st.columns(4)
+# c1.metric("📄 전체 발행 수", f"{kpi[0]['total_cnt']:,}")
+# c2.metric("👤 참여 FC 수", f"{kpi[0]['fc_cnt']:,}")
+# c3.metric("🗓 오늘 발행", f"{kpi[0]['today_cnt']:,}")
+# c4.metric("⏱ 최근 발행", kpi[0]["last_issue_at"][:16])

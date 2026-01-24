@@ -29,35 +29,29 @@ def verify_token(token: str) -> dict:
     if not hmac.compare_digest(sig, expected):
         raise ValueError("Invalid signature")
 
-    payload = json.loads(payload_raw.decode("utf-8"))
+    payload = json.loads(payload_raw.decode())
 
-    # exp 체크
-    now = int(time.time())
-    exp = int(payload.get("exp", 0))
-    if now > exp:
-        raise ValueError("Token expired")
-
-    # 공통 필수
-    name = str(payload.get("name", "")).strip()
     role = payload.get("role", "fc")
 
+    name = payload.get("name")
     if not name:
         raise ValueError("Missing name")
 
-    # FC만 phone 필수
-    phone = payload.get("phone")
     if role == "fc":
-        if not phone:
-            raise ValueError("Missing phone for FC")
-        phone = re.sub(r"\D", "", str(phone))
+        phone = payload.get("phone")
+        fc_code = payload.get("fc_code")
+        if not phone or not fc_code:
+            raise ValueError("Missing FC fields")
+    else:  # admin
+        phone = payload.get("phone")  # optional
+        fc_code = None
 
     return {
         "name": name,
         "phone": phone,
+        "fc_code": fc_code,
         "email": payload.get("email"),
-        "org": payload.get("org", ""),
-        "fc_code": payload.get("fc_code"),
-        "role": role,          # 'fc' | 'admin'
+        "org": payload.get("org"),
+        "role": role,
         "id": payload.get("id"),
     }
-
