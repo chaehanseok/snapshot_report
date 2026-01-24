@@ -1010,9 +1010,9 @@ st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
 st.divider()
 
-st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
-st.write("KST 오늘 날짜:", today_kst_date_str())
-st.write("오늘 발행 건수:", get_today_report_issue_count())
+# st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
+# st.write("KST 오늘 날짜:", today_kst_date_str())
+# st.write("오늘 발행 건수:", get_today_report_issue_count())
 
 # -------------------------
 # 고객 기본 정보 (한 줄 정렬)
@@ -1315,9 +1315,6 @@ components.html(final_html, height=900, scrolling=True)
 
 st.divider()
 st.subheader("확정 및 PDF 출력")
-
-st.write("NEXT SEQ:", get_next_daily_seq())
-
 
 if st.button("확정 후 PDF 생성"):
     if not customer_name.strip():
