@@ -5,6 +5,8 @@ import requests
 import zipfile
 from io import BytesIO
 from utils.auth import verify_token
+from utils.r2 import generate_presigned_pdf_url
+
 
 # =================================================
 # D1 Query Helper
@@ -64,8 +66,6 @@ def verify_admin():
         st.error("관리자 토큰이 없습니다.")
         st.stop()
 
-    # 기존 app.py 의 verify_token 재사용
-    from app import verify_token
     user = verify_token(token)
 
     if user.get("role") != "admin":
