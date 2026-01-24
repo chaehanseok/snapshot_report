@@ -1031,12 +1031,9 @@ token = st.query_params.get("token")
 c1, c2 = st.columns([1, 3])
 
 with c1:
-    st.page_link(
-        page="my_reports",          # ✅ pages/my_reports.py
-        label="📄 내 발행 이력 보기",
-        icon="📄",
-        query_params={"token": token},
-        use_container_width=True,
+if st.button("📄 내 발행 이력 보기", use_container_width=True):
+    st.switch_page(
+        f"pages/my_reports.py?token={token}"
     )
 
 with c2:
