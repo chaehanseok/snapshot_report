@@ -107,18 +107,21 @@ st.divider()
 # =================================================
 st.subheader("🔎 발행 목록 필터")
 
-f1, f2, f3 = st.columns(3)
+f1, f2, f3, f4 = st.columns(4)
 
 with f1:
     fc_name = st.text_input("FC 이름")
 
 with f2:
+    customer_name = st.text_input("고객명")  # ✅ 추가
+
+with f3:
     age_band = st.selectbox(
         "연령대",
         ["전체", "20대", "30대", "40대", "50대", "60대", "70대"],
     )
 
-with f3:
+with f4:
     date_from = st.date_input("시작일")
 
 where = ["1=1"]
@@ -128,6 +131,10 @@ if fc_name:
     where.append("fc_name LIKE ?")
     params.append(f"%{fc_name}%")
 
+if customer_name:  # ✅ 추가
+    where.append("customer_name LIKE ?")
+    params.append(f"%{customer_name}%")
+
 if age_band != "전체":
     where.append("customer_age_band = ?")
     params.append(age_band)
@@ -135,6 +142,7 @@ if age_band != "전체":
 if date_from:
     where.append("DATE(created_at) >= ?")
     params.append(str(date_from))
+
 
 
 # =================================================
