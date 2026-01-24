@@ -1306,6 +1306,7 @@ context = {
     "structure_rows": structure_rows,
 
     "footer": LEGAL_FOOTER,
+    "compliance_code": "심의번호 발행 예정",  # ⭐ 여기 추가
 }
 
 final_html = build_final_html_for_both(context)
@@ -1331,7 +1332,7 @@ if st.button("확정 후 PDF 생성"):
     context["customer"]["name"] = customer_name.strip()
     context["segment"]["headline"] = segment["headline"].replace("{customer_name}", customer_name.strip())
 
-    context["compliance_code"] = "심의번호 발행 예정"
+    # context["compliance_code"] = "심의번호 발행 예정"
 
     final_html = build_final_html_for_both(context)
 
@@ -1356,6 +1357,12 @@ if st.button("확정 후 PDF 생성"):
 
         st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
 
+        st.download_button(
+            label="📄 발행된 PDF 다운로드",
+            data=pdf_bytes,
+            file_name=f"{compliance_code}.pdf",
+            mime="application/pdf",
+        )
 
     except Exception as e:
         st.error(f"발행 중 오류 발생:\n{e}")
