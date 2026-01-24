@@ -1031,10 +1031,10 @@ token = st.query_params.get("token")
 c1, c2 = st.columns([1, 3])
 
 with c1:
-if st.button("📄 내 발행 이력 보기", use_container_width=True):
-    st.switch_page(
-        f"pages/my_reports.py?token={token}"
-    )
+    if st.button("📄 내 발행 이력 보기", use_container_width=True):
+        st.switch_page(
+            f"pages/my_reports.py?token={token}"
+        )
 
 with c2:
     st.caption(
