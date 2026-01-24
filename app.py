@@ -348,10 +348,11 @@ def generate_compliance_code(
 
     return compliance_code
 
+import time
+
 def publish_report(
     *,
     pdf_bytes: bytes,
-    compliance_code: str,   # ⭐ 외부에서 받음
     segments_version: str,
     fc_id: str,
     fc_name: str,
@@ -365,50 +366,61 @@ def publish_report(
     min_cpp_manwon: int,
 ) -> str:
     """
-    리포트 공식 발행 처리
-    - 준법 심의번호 생성
+    리포트 공식 발행 처리 (동시성 안전)
+    - 발행번호 생성
     - PDF R2 업로드
     - report_issue 감사 메타 DB 기록
-    - 성공 시 compliance_code 반환
     """
 
-    # 2️⃣ PDF → R2 업로드
-    try:
-        pdf_r2_key, pdf_filename = upload_pdf_to_r2(
-            pdf_bytes=pdf_bytes,
-            compliance_code=compliance_code,
-        )
-    except Exception as e:
-        raise RuntimeError(f"PDF R2 업로드 실패: {e}")
+    last_error = None
 
-    # 3️⃣ 감사 메타 DB 기록
-    try:
-        insert_report_issue(
-            fc_id=fc_id,
-            fc_name=fc_name,
-            customer_name=customer_name,
-            customer_gender=customer_gender,
-            customer_age_band=customer_age_band,
-            start_year=start_year,
-            end_year=end_year,
-            sort_key=sort_key,
-            min_prev_100k=min_prev_100k,
-            min_cpp_manwon=min_cpp_manwon,
-            pdf_r2_key=pdf_r2_key,
-            pdf_filename=pdf_filename,
-            compliance_code=compliance_code,
-            segments_version=segments_version,
+    for attempt in range(5):  # ⭐ 최대 5번 재시도
+        compliance_code = generate_compliance_code(
+            service_name="보장점검",
+            version=segments_version,
         )
-    except Exception as e:
-        # ⚠️ 여기서 실패하면:
-        # - R2에는 PDF가 있으나
-        # - DB에는 기록이 없는 상태
-        # → 이건 “미등록 발행물”로 감사 대상
-        # → 로그로 반드시 남겨야 함
-        raise RuntimeError(f"report_issue DB 기록 실패: {e}")
 
-    # 4️⃣ 성공 → 심의번호 반환
-    return compliance_code
+        try:
+            # 1️⃣ PDF → R2 업로드
+            pdf_r2_key, pdf_filename = upload_pdf_to_r2(
+                pdf_bytes=pdf_bytes,
+                compliance_code=compliance_code,
+            )
+
+            # 2️⃣ DB INSERT
+            insert_report_issue(
+                fc_id=fc_id,
+                fc_name=fc_name,
+                customer_name=customer_name,
+                customer_gender=customer_gender,
+                customer_age_band=customer_age_band,
+                start_year=start_year,
+                end_year=end_year,
+                sort_key=sort_key,
+                min_prev_100k=min_prev_100k,
+                min_cpp_manwon=min_cpp_manwon,
+                pdf_r2_key=pdf_r2_key,
+                pdf_filename=pdf_filename,
+                compliance_code=compliance_code,
+                segments_version=segments_version,
+            )
+
+            # ✅ 성공
+            return compliance_code
+
+        except Exception as e:
+            last_error = e
+
+            # UNIQUE 충돌 → 정상 재시도
+            if "UNIQUE constraint failed" in str(e):
+                time.sleep(0.05)  # 아주 짧은 대기
+                continue
+
+            # 그 외 에러는 즉시 실패
+            raise
+
+    # 5번 다 실패
+    raise RuntimeError(f"발행번호 생성 실패 (동시성 충돌): {last_error}")
 
 
 # =========================================================
@@ -1050,26 +1062,6 @@ with fc2:
     min_cpp_manwon = st.slider("최소 1인당 진료비(만원)", 0, 5000, 100, 10)
     min_cpp_chewon = manwon_to_chewon(min_cpp_manwon)
 
-if st.button("🧪 발행 테스트 (더미 PDF)"):
-    dummy_pdf = make_dummy_pdf_bytes()
-
-    code = publish_report(
-        pdf_bytes=dummy_pdf,
-        segments_version="1.0.0",
-        fc_id=planner["fc_code"],
-        fc_name=planner["name"],
-        customer_name="테스트고객",
-        customer_gender="남성",
-        customer_age_band="40대",
-        start_year=2020,
-        end_year=2024,
-        sort_key=sort_key,
-        min_prev_100k=min_prev_100k,
-        min_cpp_manwon=min_cpp_manwon,
-    )
-
-    st.success(f"✅ 발행 성공 · 심의번호: {code}")
-
 # -------------------------
 # D1 기반 통계 (현재 + 이후 + 신규부각)
 # -------------------------
@@ -1350,10 +1342,9 @@ if st.button("확정 후 PDF 생성"):
     try:
         pdf_bytes = chromium_pdf_bytes(final_html)
 
-        # 3️⃣ 공식 발행 (R2 + D1)
-        publish_report(
+        # ✅ 공식 발행 (발행번호 생성 + R2 + D1)
+        compliance_code = publish_report(
             pdf_bytes=pdf_bytes,
-            compliance_code=compliance_code,
             segments_version=APP_VERSION,
             fc_id=planner["fc_code"],
             fc_name=planner["name"],
