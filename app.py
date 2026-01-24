@@ -1026,12 +1026,16 @@ st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
 st.divider()
 
+token = st.query_params.get("token")
+
 c1, c2 = st.columns([1, 3])
 
 with c1:
-    st.link_button(
-        "📄 내 발행 이력 보기",
-        f"/my_reports?token={st.query_params.get('token')}",
+    st.page_link(
+        page="my_reports",          # ✅ pages/my_reports.py
+        label="📄 내 발행 이력 보기",
+        icon="📄",
+        query_params={"token": token},
         use_container_width=True,
     )
 
