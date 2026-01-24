@@ -2,6 +2,34 @@ import streamlit as st
 import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from app import verify_token
+
+# =================================================
+# Page Config (⚠️ 반드시 최상단)
+# =================================================
+st.set_page_config(
+    page_title="내 발행 이력",
+    layout="wide",
+)
+
+# =================================================
+# 인증 (session_state 기반)
+# =================================================
+token = st.session_state.get("auth_token")
+
+if not token:
+    st.error("접속 토큰이 없습니다. 처음 화면에서 다시 접속해 주세요.")
+    st.stop()
+
+try:
+    fc = verify_token(token)
+except Exception as e:
+    st.error(f"인증 실패: {e}")
+    st.stop()
+
+if not fc.get("fc_code"):
+    st.error("FC 계정이 아닙니다.")
+    st.stop()
 
 # =================================================
 # D1 Query Helper
@@ -33,36 +61,9 @@ def d1_query(sql: str, params: list):
 
     return data["result"][0]["results"] if data.get("result") else []
 
-
 # =================================================
-# FC 인증
+# Header
 # =================================================
-def verify_fc():
-    token = st.query_params.get("token")
-    if not token:
-        st.error("접속 토큰이 없습니다.")
-        st.stop()
-
-    from app import verify_token
-    user = verify_token(token)
-
-    if not user.get("fc_code"):
-        st.error("FC 계정이 아닙니다.")
-        st.stop()
-
-    return user
-
-
-# =================================================
-# Page Config
-# =================================================
-st.set_page_config(
-    page_title="내 발행 이력",
-    layout="wide",
-)
-
-fc = verify_fc()
-
 st.title("📄 내 발행 이력")
 st.caption(f"FC: {fc['name']} ({fc['fc_code']})")
 

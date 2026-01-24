@@ -1033,8 +1033,8 @@ c1, c2 = st.columns([1, 3])
 with c1:
     if st.button("📄 내 발행 이력 보기", use_container_width=True):
         # ✅ 1. query_params에 token 설정
-        st.query_params.clear()
-        st.query_params["token"] = token
+        st.session_state["auth_token"] = token
+        st.switch_page("pages/my_reports.py")
 
         # ✅ 2. 페이지 이동 (경로만!)
         st.switch_page("pages/my_reports.py")
