@@ -103,7 +103,9 @@ bucket = st.secrets["R2_BUCKET_NAME"]
 endpoint = st.secrets["R2_ENDPOINT"]
 
 for r in rows:
-    pdf_url = generate_presigned_pdf_url(r["pdf_r2_key"])
+    pdf_url = generate_presigned_pdf_url(
+        r2_key=r["pdf_r2_key"]
+    )
 
     with st.container(border=True):
         c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 2, 1])
