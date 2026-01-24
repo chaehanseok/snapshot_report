@@ -27,6 +27,7 @@ from datetime import date, timedelta
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import boto3
+import copy
 
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
@@ -334,6 +335,7 @@ def generate_compliance_code(
 def publish_report(
     *,
     pdf_bytes: bytes,
+    compliance_code: str,   # ⭐ 외부에서 받음
     segments_version: str,
     fc_id: str,
     fc_name: str,
@@ -356,10 +358,10 @@ def publish_report(
     last_error = None
 
     for attempt in range(5):  # ⭐ 최대 5번 재시도
-        compliance_code = generate_compliance_code(
-            service_name="보장점검",
-            version=segments_version,
-        )
+        # compliance_code = generate_compliance_code(
+        #     service_name="보장점검",
+        #     version=segments_version,
+        # )
 
         try:
             # 1️⃣ PDF → R2 업로드
@@ -1322,26 +1324,33 @@ if st.button("확정 후 PDF 생성"):
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
 
-    # 1️⃣ 발행번호 생성 (이 시점이 유일)
+    # 1️⃣ 발행번호 생성 (D1 시퀀스)
     compliance_code = generate_compliance_code(
         service_name="보장점검",
         version=APP_VERSION,
     )
 
+    # 2️⃣ PDF 전용 context 복사 (⭐ 반드시 deepcopy)
+    pdf_context = copy.deepcopy(context)
+    pdf_context["customer"]["name"] = customer_name.strip()
+    pdf_context["segment"]["headline"] = segment["headline"].replace(
+        "{customer_name}", customer_name.strip()
+    )
+    pdf_context["compliance_code"] = (
+        f"{compliance_code} ({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
+    )
 
-    context["customer"]["name"] = customer_name.strip()
-    context["segment"]["headline"] = segment["headline"].replace("{customer_name}", customer_name.strip())
-
-    # context["compliance_code"] = "심의번호 발행 예정"
-
-    final_html = build_final_html_for_both(context)
+    # 3️⃣ PDF HTML 생성
+    pdf_html = build_final_html_for_both(pdf_context)
 
     try:
-        pdf_bytes = chromium_pdf_bytes(final_html)
+        # 4️⃣ PDF 생성
+        pdf_bytes = chromium_pdf_bytes(pdf_html)
 
-        # ✅ 공식 발행 (발행번호 생성 + R2 + D1)
-        compliance_code = publish_report(
+        # 5️⃣ 발행 기록
+        publish_report(
             pdf_bytes=pdf_bytes,
+            compliance_code=compliance_code,
             segments_version=APP_VERSION,
             fc_id=planner["fc_code"],
             fc_name=planner["name"],
