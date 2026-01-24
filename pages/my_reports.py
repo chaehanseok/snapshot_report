@@ -148,4 +148,8 @@ for r in rows:
                 [r["compliance_code"], fc["fc_code"]],
             )
 
-            st.components.v1.iframe(pdf_url, height=600)
+            st.link_button(
+                "🌐 PDF 미리보기 (새 창)",
+                pdf_url,
+                use_container_width=True,
+            )

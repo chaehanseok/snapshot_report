@@ -14,22 +14,25 @@ def get_r2_client():
 
 
 def generate_presigned_pdf_url(
-    *,
     r2_key: str,
-    expires_sec: int = 600,   # 10분
+    expires_in: int = 300,  # 5분
 ) -> str:
-    """
-    R2에 저장된 PDF에 대한 presigned GET URL 생성
-    """
-    r2 = get_r2_client()
-    bucket = st.secrets["R2_BUCKET_NAME"]
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=st.secrets["R2_ENDPOINT"],
+        aws_access_key_id=st.secrets["R2_ACCESS_KEY_ID"],
+        aws_secret_access_key=st.secrets["R2_SECRET_ACCESS_KEY"],
+        region_name="auto",
+    )
 
-    url = r2.generate_presigned_url(
+    return s3.generate_presigned_url(
         ClientMethod="get_object",
         Params={
-            "Bucket": bucket,
+            "Bucket": st.secrets["R2_BUCKET_NAME"],
             "Key": r2_key,
+            # 🔥 이 두 줄이 핵심
+            "ResponseContentDisposition": "inline",
+            "ResponseContentType": "application/pdf",
         },
-        ExpiresIn=expires_sec,
+        ExpiresIn=expires_in,
     )
-    return url
