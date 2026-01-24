@@ -25,6 +25,7 @@ from matplotlib.ticker import FuncFormatter
 from matplotlib import font_manager as fm
 from datetime import date, timedelta
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
@@ -167,15 +168,17 @@ def fetch_year_range() -> tuple[int, int]:
 
 def get_today_report_issue_count() -> int:
     """
-    오늘(created_at 기준, localtime) 발행된 pamphlet_issue 건수 조회
-    - 매일 00시 기준으로 reset되는 #### 시퀀스용
+    KST 기준 오늘 발행된 report_issue 건수 조회
+    - #### 시퀀스 생성용
     """
+    today_kst = today_kst_date_str()
+
     sql = """
     SELECT COUNT(*) AS cnt
-    FROM pamphlet_issue
-    WHERE date(created_at) = date('now', 'localtime');
+    FROM report_issue
+    WHERE date(created_at) = ?;
     """
-    rows = d1_query(sql, [])
+    rows = d1_query(sql, [today_kst])   # ⭐⭐⭐ 여기 핵심
     if not rows:
         return 0
     return int(rows[0].get("cnt", 0))
@@ -824,6 +827,12 @@ def next_age_band_label(age_band: str) -> str:
         return f"{base + 10}대 이후"
     except Exception:
         return "이후 연령대"
+    
+def today_kst_date_str() -> str:
+    """
+    KST 기준 오늘 날짜를 YYYY-MM-DD 문자열로 반환
+    """
+    return datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
 
 # =========================================================
 # PDF generation (Chromium via Playwright)
@@ -877,6 +886,7 @@ st.write(f"연락처 : **{planner_phone_display}**")
 st.divider()
 
 st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
+st.write("KST 오늘 날짜:", today_kst_date_str())
 st.write("오늘 발행 건수:", get_today_report_issue_count())
 
 if st.button("🧪 발행 테스트 (더미 PDF)"):
