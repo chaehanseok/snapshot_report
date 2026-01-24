@@ -36,18 +36,27 @@ def verify_token(token: str) -> dict:
     if now > exp:
         raise ValueError("Token expired")
 
-    name = str(payload.get("name", "")).strip()
-    phone = str(payload.get("phone", "")).strip()
+    # ✅ 먼저 role 정의
+    role = payload.get("role", "fc")
 
-    if not name or not phone:
-        raise ValueError("Missing user info")
+    name = str(payload.get("name", "")).strip()
+    if not name:
+        raise ValueError("Missing name")
+
+    # ✅ role에 따라 phone 처리
+    phone = payload.get("phone")
+    if role == "fc":
+        phone = str(phone or "").strip()
+        if not phone:
+            raise ValueError("Missing phone for FC")
 
     return {
         "name": name,
-        "phone": re.sub(r"\D", "", phone),
+        "phone": re.sub(r"\D", "", phone) if phone else None,
         "email": payload.get("email"),
         "org": payload.get("org", ""),
         "fc_code": payload.get("fc_code"),
-        "role": payload.get("role", "fc"),  # 'fc' | 'admin'
-        "id": payload.get("id"),
+        "role": role,              # 'fc' | 'admin'
+        "admin_id": payload.get("email"),  # 관리자 이벤트 로그용
     }
+
