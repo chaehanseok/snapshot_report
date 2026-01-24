@@ -1,5 +1,6 @@
-import streamlit as st
 import boto3
+import streamlit as st
+from datetime import timedelta
 
 
 def get_r2_client():
@@ -12,16 +13,23 @@ def get_r2_client():
     )
 
 
-def generate_presigned_pdf_url(r2_key: str, expires: int = 300) -> str:
+def generate_presigned_pdf_url(
+    *,
+    r2_key: str,
+    expires_sec: int = 600,   # 10분
+) -> str:
     """
-    R2 Private Object에 대한 임시 접근 URL 생성
+    R2에 저장된 PDF에 대한 presigned GET URL 생성
     """
     r2 = get_r2_client()
-    return r2.generate_presigned_url(
-        "get_object",
+    bucket = st.secrets["R2_BUCKET_NAME"]
+
+    url = r2.generate_presigned_url(
+        ClientMethod="get_object",
         Params={
-            "Bucket": st.secrets["R2_BUCKET_NAME"],
+            "Bucket": bucket,
             "Key": r2_key,
         },
-        ExpiresIn=expires,
+        ExpiresIn=expires_sec,
     )
+    return url
