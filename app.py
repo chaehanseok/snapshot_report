@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from matplotlib import font_manager as fm
 from datetime import date, timedelta
+from datetime import datetime
 
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
@@ -164,7 +165,7 @@ def fetch_year_range() -> tuple[int, int]:
         return (2010, 2024)
     return (int(row[0].get("min_year") or 2010), int(row[0].get("max_year") or 2024))
 
-def get_today_issue_count() -> int:
+def get_today_report_issue_count() -> int:
     """
     오늘(created_at 기준, localtime) 발행된 pamphlet_issue 건수 조회
     - 매일 00시 기준으로 reset되는 #### 시퀀스용
@@ -179,6 +180,45 @@ def get_today_issue_count() -> int:
         return 0
     return int(rows[0].get("cnt", 0))
 
+def insert_report_issue(
+    *,
+    fc_id: str,
+    fc_name: str,
+    customer_name: str | None,
+    customer_gender: str,
+    customer_age_band: str,
+    start_year: int,
+    end_year: int,
+    sort_key: str,
+    min_prev_100k: float,
+    min_cpp_manwon: int,
+    pdf_r2_key: str,
+    pdf_filename: str,
+    compliance_code: str,
+    segments_version: str,
+):
+    sql = """
+    INSERT INTO report_issue (
+        fc_id, fc_name,
+        customer_name, customer_gender, customer_age_band,
+        start_year, end_year, sort_key,
+        min_prev_100k, min_cpp_manwon,
+        pdf_r2_key, pdf_filename,
+        compliance_code, segments_version
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    """
+    params = [
+        fc_id, fc_name,
+        customer_name, customer_gender, customer_age_band,
+        start_year, end_year, sort_key,
+        min_prev_100k, min_cpp_manwon,
+        pdf_r2_key, pdf_filename,
+        compliance_code, segments_version,
+    ]
+    d1_query(sql, params)
+
+def make_dummy_pdf_bytes() -> bytes:
+    return b"%PDF-1.4\n%Dummy PDF for test\n%%EOF"
 
 # =========================================================
 # matplotlib font fix (Korean)
@@ -231,6 +271,28 @@ def manwon_to_chewon(m: int) -> int:
     # 만원 -> 천원
     return int(m) * 10
 
+def upload_pdf_to_r2(
+    pdf_bytes: bytes,
+    compliance_code: str,
+) -> tuple[str, str]:
+    r2 = get_r2_client()
+    bucket = st.secrets["R2_BUCKET_NAME"]
+
+    now = datetime.now()
+    year = now.strftime("%Y")
+    mmdd = now.strftime("%m%d")
+
+    filename = f"{compliance_code}.pdf"
+    r2_key = f"report/{year}/{mmdd}/{filename}"
+
+    r2.put_object(
+        Bucket=bucket,
+        Key=r2_key,
+        Body=pdf_bytes,
+        ContentType="application/pdf",
+    )
+
+    return r2_key, filename
 
 # =========================================================
 # Chart (Top15 combo: bar 1 + line 2)  [유병률 기반]
@@ -815,7 +877,28 @@ st.write(f"연락처 : **{planner_phone_display}**")
 st.divider()
 
 st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
-st.write("오늘 발행 건수:", get_today_issue_count())
+st.write("오늘 발행 건수:", get_today_report_issue_count())
+
+if st.button("🧪 발행 테스트 (더미 PDF)"):
+    dummy_pdf = make_dummy_pdf_bytes()
+
+    code = publish_report(
+        pdf_bytes=dummy_pdf,
+        segments_version="1.0.0",
+        fc_id=planner["fc_code"],
+        fc_name=planner["name"],
+        customer_name="테스트고객",
+        customer_gender="남성",
+        customer_age_band="40대",
+        start_year=2020,
+        end_year=2024,
+        sort_key=sort_key,
+        min_prev_100k=min_prev_100k,
+        min_cpp_manwon=min_cpp_manwon,
+    )
+
+    st.success(f"✅ 발행 성공 · 심의번호: {code}")
+
 
 # -------------------------
 # 고객 기본 정보 (한 줄 정렬)
