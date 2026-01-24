@@ -3,6 +3,7 @@ import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from app import verify_token
+from app import generate_presigned_pdf_url
 
 # =================================================
 # Page Config (⚠️ 반드시 최상단)
@@ -102,7 +103,7 @@ bucket = st.secrets["R2_BUCKET_NAME"]
 endpoint = st.secrets["R2_ENDPOINT"]
 
 for r in rows:
-    pdf_url = f"{endpoint}/{bucket}/{r['pdf_r2_key']}"
+    pdf_url = generate_presigned_pdf_url(r["pdf_r2_key"])
 
     with st.container(border=True):
         c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 2, 1])

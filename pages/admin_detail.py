@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from app import generate_presigned_pdf_url
 
 # =================================================
 # D1 Query Helper
@@ -123,7 +124,7 @@ st.divider()
 # =================================================
 bucket = st.secrets["R2_BUCKET_NAME"]
 endpoint = st.secrets["R2_ENDPOINT"]
-pdf_url = f"{endpoint}/{bucket}/{issue['pdf_r2_key']}"
+pdf_url = generate_presigned_pdf_url(issue["pdf_r2_key"], expires=600)
 
 st.subheader("📎 PDF 문서")
 

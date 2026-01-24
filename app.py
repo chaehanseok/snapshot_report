@@ -422,6 +422,20 @@ def get_next_daily_seq() -> int:
     rows = d1_query(sql, [today])
     return int(rows[0]["seq"])
 
+def generate_presigned_pdf_url(r2_key: str, expires: int = 300) -> str:
+    """
+    R2 Private Object에 대한 임시 접근 URL 생성
+    - expires: 초 단위 (기본 5분)
+    """
+    r2 = get_r2_client()
+    return r2.generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": st.secrets["R2_BUCKET_NAME"],
+            "Key": r2_key,
+        },
+        ExpiresIn=expires,
+    )
 
 
 # =========================================================

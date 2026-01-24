@@ -46,8 +46,8 @@ def build_zip_from_issues(issues: list[dict]) -> bytes:
 
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as z:
         for r in issues:
-            pdf_url = f"{endpoint}/{bucket}/{r['pdf_r2_key']}"
-            resp = requests.get(pdf_url, timeout=30)
+            signed_url = generate_presigned_pdf_url(r["pdf_r2_key"], expires=600)
+            resp = requests.get(signed_url, timeout=30)
             if resp.ok:
                 z.writestr(r["pdf_filename"], resp.content)
 
