@@ -80,43 +80,6 @@ def verify_admin():
 
     return user
 
-
-
-# =================================================
-# Page Config
-# =================================================
-st.set_page_config(
-    page_title="관리자 · 발행 대시보드",
-    layout="wide",
-)
-
-st.title("🛠 관리자 페이지")
-st.caption("관리자 전용 발행 관리 화면입니다.")
-
-# 🔹 token 사전 체크
-token = st.query_params.get("token")
-
-if not token:
-    st.warning("관리자 토큰이 필요합니다.")
-    st.info("정상적인 관리자 링크로 접속해 주세요.")
-    st.stop()
-
-# 🔹 여기부터 진짜 인증
-if isinstance(token, list):
-    token = token[0]    
-
-admin = verify_admin()
-
-
-kst_now = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
-st.caption(f"기준 시각(KST): {kst_now}")
-
-if admin.get("role") != "admin":
-    st.error("관리자 권한이 없습니다.")
-    st.stop()
-
-st.divider()
-
 # =================================================
 # 1️⃣ KPI 요약
 # =================================================
@@ -310,3 +273,40 @@ if age_rows:
         "발행 건수": [r["cnt"] for r in age_rows],
     }
     st.bar_chart(age_df, x="연령대", y="발행 건수", use_container_width=True)
+
+# =================================================
+# Page Config
+# =================================================
+st.set_page_config(
+    page_title="관리자 · 발행 대시보드",
+    layout="wide",
+)
+
+st.title("🛠 관리자 페이지")
+st.caption("관리자 전용 발행 관리 화면입니다.")
+
+# 🔹 token 사전 체크
+token = st.query_params.get("token")
+
+if not token:
+    st.warning("관리자 토큰이 필요합니다.")
+    st.info("정상적인 관리자 링크로 접속해 주세요.")
+    st.stop()
+
+# 🔹 여기부터 진짜 인증
+if isinstance(token, list):
+    token = token[0]    
+
+admin = verify_admin()
+
+
+kst_now = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
+st.caption(f"기준 시각(KST): {kst_now}")
+
+if admin.get("role") != "admin":
+    st.error("관리자 권한이 없습니다.")
+    st.stop()
+
+st.divider()
+
+
