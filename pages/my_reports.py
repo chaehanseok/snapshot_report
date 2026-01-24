@@ -13,25 +13,6 @@ st.set_page_config(
     layout="wide",
 )
 
-st.markdown(
-    """
-    <style>
-    .nowrap {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .btn-col {
-        display: flex;
-        gap: 0.5rem;
-        justify-content: flex-end;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
 # =================================================
 # 인증 (session_state 기반)
 # =================================================
@@ -125,34 +106,46 @@ for r in rows:
     pdf_url = generate_presigned_pdf_url(r2_key=r["pdf_r2_key"])
 
     with st.container(border=True):
-        c1, c2, c3, c4, c5 = st.columns([4.5, 1.5, 1, 1.8, 2.2])
+        c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 1, 2, 1.2, 1.2])
 
-        # 심의번호 (절대 줄바꿈 금지)
-        c1.markdown(
-            f"<div class='nowrap'><strong>{r['compliance_code']}</strong></div>",
-            unsafe_allow_html=True,
-        )
-
+        c1.markdown(f"**{r['compliance_code']}**")
         c2.write(r["customer_name"] or "-")
         c3.write(r["customer_age_band"])
         c4.write(r["created_at"][:16])
 
+        # 👁 미리보기 (새 창)
         with c5:
-            st.markdown("<div class='btn-col'>", unsafe_allow_html=True)
-
             st.link_button(
                 "👁 미리보기",
                 pdf_url,
-                use_container_width=False,
+                use_container_width=True,
             )
 
+            # view 로그 (1회만 찍고 싶으면 조건 추가 가능)
+            d1_query(
+                """
+                INSERT INTO report_issue_event
+                (compliance_code, event_type, actor_type, actor_id)
+                VALUES (?, 'view', 'fc', ?);
+                """,
+                [r["compliance_code"], fc["fc_code"]],
+            )
+
+        # ⬇ 다운로드 (⭐ 핵심)
+        with c6:
             st.download_button(
-                "⬇ 다운로드",
-                data=requests.get(pdf_url).content,
+                label="⬇ 다운로드",
+                data=requests.get(pdf_url, timeout=30).content,
                 file_name=r["pdf_filename"],
                 mime="application/pdf",
+                use_container_width=True,
                 key=f"dl_{r['compliance_code']}",
+                on_click=lambda code=r["compliance_code"]: d1_query(
+                    """
+                    INSERT INTO report_issue_event
+                    (compliance_code, event_type, actor_type, actor_id)
+                    VALUES (?, 'download', 'fc', ?);
+                    """,
+                    [code, fc["fc_code"]],
+                ),
             )
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
