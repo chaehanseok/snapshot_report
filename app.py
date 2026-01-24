@@ -961,6 +961,20 @@ def today_kst_date_str() -> str:
     """
     return datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d")
 
+def insert_report_event(
+    compliance_code: str,
+    event_type: str,
+    actor_type: str,
+    actor_id: str | None,
+):
+    sql = """
+    INSERT INTO report_issue_event
+    (compliance_code, event_type, actor_type, actor_id)
+    VALUES (?, ?, ?, ?);
+    """
+    d1_query(sql, [compliance_code, event_type, actor_type, actor_id])
+
+
 # =========================================================
 # PDF generation (Chromium via Playwright)
 # =========================================================
@@ -1011,6 +1025,20 @@ st.write(f"FC명 : **{planner['name']}**")
 st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
 st.divider()
+
+c1, c2 = st.columns([1, 3])
+
+with c1:
+    st.link_button(
+        "📄 내 발행 이력 보기",
+        f"/my_reports?token={st.query_params.get('token')}",
+        use_container_width=True,
+    )
+
+with c2:
+    st.caption(
+        "※ 본인이 발행한 보장점검 리포트의 발행 이력, PDF 열람 및 다운로드 내역을 확인할 수 있습니다."
+    )
 
 # st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
 # st.write("KST 오늘 날짜:", today_kst_date_str())
@@ -1323,7 +1351,7 @@ if st.button("확정 후 PDF 생성"):
     if not customer_name.strip():
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
-
+    
     # 1️⃣ 발행번호 생성 (D1 시퀀스)
     compliance_code = generate_compliance_code(
         service_name="보장점검",
@@ -1364,6 +1392,14 @@ if st.button("확정 후 PDF 생성"):
             min_cpp_manwon=min_cpp_manwon,
         )
 
+        # 2️⃣ 발행 이벤트 기록 (⭐ 여기!)
+        insert_report_event(
+            compliance_code=compliance_code,
+            event_type="issue",
+            actor_type="fc",
+            actor_id=planner["fc_code"],
+        )
+
         st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
 
         st.download_button(
@@ -1371,7 +1407,13 @@ if st.button("확정 후 PDF 생성"):
             data=pdf_bytes,
             file_name=f"{compliance_code}.pdf",
             mime="application/pdf",
-        )
+            on_click=lambda: insert_report_event(
+                compliance_code=compliance_code,
+                event_type="download",
+                actor_type="fc",
+                actor_id=planner["fc_code"],
+                )
+            )
 
     except Exception as e:
         st.error(f"발행 중 오류 발생:\n{e}")
