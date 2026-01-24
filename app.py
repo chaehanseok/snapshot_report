@@ -345,6 +345,7 @@ def generate_compliance_code(
 def publish_report(
     *,
     pdf_bytes: bytes,
+    compliance_code: str,   # ⭐ 외부에서 받음
     segments_version: str,
     fc_id: str,
     fc_name: str,
@@ -364,12 +365,6 @@ def publish_report(
     - report_issue 감사 메타 DB 기록
     - 성공 시 compliance_code 반환
     """
-
-    # 1️⃣ 준법 심의번호 생성
-    compliance_code = generate_compliance_code(
-        service_name="보장점검",
-        version=segments_version,
-    )
 
     # 2️⃣ PDF → R2 업로드
     try:
