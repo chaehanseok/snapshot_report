@@ -103,23 +103,39 @@ bucket = st.secrets["R2_BUCKET_NAME"]
 endpoint = st.secrets["R2_ENDPOINT"]
 
 for r in rows:
-    pdf_url = generate_presigned_pdf_url(
-        r2_key=r["pdf_r2_key"]
-    )
+    pdf_url = generate_presigned_pdf_url(r2_key=r["pdf_r2_key"])
 
     with st.container(border=True):
-        c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 2, 1])
+        c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 1, 2, 1.2, 1])
 
         c1.markdown(f"**{r['compliance_code']}**")
         c2.write(r["customer_name"] or "-")
         c3.write(r["customer_age_band"])
         c4.write(r["created_at"][:16])
 
+        # 👁 미리보기 (새 창)
         with c5:
-            if st.button("📥", key=f"dl_{r['compliance_code']}"):
+            st.link_button(
+                "👁 미리보기",
+                pdf_url,
+                use_container_width=True,
+            )
+
+            # view 이벤트 기록
+            d1_query(
+                """
+                INSERT INTO report_issue_event
+                (compliance_code, event_type, actor_type, actor_id)
+                VALUES (?, 'view', 'fc', ?);
+                """,
+                [r["compliance_code"], fc["fc_code"]],
+            )
+
+        # ⬇ 다운로드
+        with c6:
+            if st.button("⬇ 다운로드", key=f"dl_{r['compliance_code']}"):
                 pdf_bytes = requests.get(pdf_url, timeout=30).content
 
-                # 🔹 다운로드 이벤트 기록
                 d1_query(
                     """
                     INSERT INTO report_issue_event
@@ -130,26 +146,9 @@ for r in rows:
                 )
 
                 st.download_button(
-                    label="PDF 저장",
+                    label="파일 저장",
                     data=pdf_bytes,
                     file_name=r["pdf_filename"],
                     mime="application/pdf",
                     key=f"dl_btn_{r['compliance_code']}",
                 )
-
-        with st.expander("미리보기"):
-            # 🔹 미리보기 이벤트 기록
-            d1_query(
-                """
-                INSERT INTO report_issue_event
-                (compliance_code, event_type, actor_type, actor_id)
-                VALUES (?, 'view', 'fc', ?);
-                """,
-                [r["compliance_code"], fc["fc_code"]],
-            )
-
-            st.link_button(
-                "🌐 PDF 미리보기 (새 창)",
-                pdf_url,
-                use_container_width=True,
-            )
