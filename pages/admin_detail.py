@@ -3,6 +3,7 @@ import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from utils.r2 import generate_presigned_pdf_url
+from utils.auth import verify_token
 
 
 # =================================================

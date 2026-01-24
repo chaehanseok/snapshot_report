@@ -6,6 +6,7 @@ import zipfile
 from io import BytesIO
 from utils.auth import verify_token
 from utils.r2 import generate_presigned_pdf_url
+st.write("✅ admin_dashboard.py loaded")
 
 
 # =================================================
