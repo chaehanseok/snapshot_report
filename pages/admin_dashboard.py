@@ -63,17 +63,23 @@ def build_zip_from_issues(issues: list[dict]) -> bytes:
 # =================================================
 def verify_admin():
     token = st.query_params.get("token")
+
     if not token:
         st.error("관리자 토큰이 없습니다.")
         st.stop()
 
+    # ⭐ 핵심: list → str
+    if isinstance(token, list):
+        token = token[0]
+
     user = verify_token(token)
 
-    if user["role"] != "admin":
+    if user.get("role") != "admin":
         st.error("관리자 전용 페이지입니다.")
         st.stop()
 
     return user
+
 
 
 # =================================================

@@ -31,32 +31,33 @@ def verify_token(token: str) -> dict:
 
     payload = json.loads(payload_raw.decode("utf-8"))
 
+    # exp 체크
     now = int(time.time())
     exp = int(payload.get("exp", 0))
     if now > exp:
         raise ValueError("Token expired")
 
-    # ✅ 먼저 role 정의
+    # 공통 필수
+    name = str(payload.get("name", "")).strip()
     role = payload.get("role", "fc")
 
-    name = str(payload.get("name", "")).strip()
     if not name:
         raise ValueError("Missing name")
 
-    # ✅ role에 따라 phone 처리
+    # FC만 phone 필수
     phone = payload.get("phone")
     if role == "fc":
-        phone = str(phone or "").strip()
         if not phone:
             raise ValueError("Missing phone for FC")
+        phone = re.sub(r"\D", "", str(phone))
 
     return {
         "name": name,
-        "phone": re.sub(r"\D", "", phone) if phone else None,
+        "phone": phone,
         "email": payload.get("email"),
         "org": payload.get("org", ""),
         "fc_code": payload.get("fc_code"),
-        "role": role,              # 'fc' | 'admin'
-        "admin_id": payload.get("email"),  # 관리자 이벤트 로그용
+        "role": role,          # 'fc' | 'admin'
+        "id": payload.get("id"),
     }
 
