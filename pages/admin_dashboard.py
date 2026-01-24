@@ -69,7 +69,7 @@ def verify_admin():
 
     user = verify_token(token)
 
-    if user.get("role") != "admin":
+    if user["role"] != "admin":
         st.error("관리자 전용 페이지입니다.")
         st.stop()
 
