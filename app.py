@@ -814,9 +814,8 @@ st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
 st.divider()
 
-st.write("오늘 발행 건수:", get_today_issue_count())
 st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
-
+st.write("오늘 발행 건수:", get_today_issue_count())
 
 # -------------------------
 # 고객 기본 정보 (한 줄 정렬)
