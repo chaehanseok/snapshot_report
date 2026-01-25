@@ -81,7 +81,7 @@ def d1_query(sql: str, params: list):
 
 def build_issue_log_csv(issues: list[dict]) -> bytes:
     """
-    조회된 발행 목록 기준 로그 CSV 생성
+    조회된 발행 목록 기준 로그 CSV 생성 (정상 집계 버전)
     """
     if not issues:
         return b""
@@ -96,9 +96,35 @@ def build_issue_log_csv(issues: list[dict]) -> bytes:
       i.customer_name,
       i.customer_age_band,
       i.created_at,
-      SUM(CASE WHEN e.event_type = 'view' THEN 1 ELSE 0 END) AS view_cnt,
-      SUM(CASE WHEN e.event_type LIKE '%download%' THEN 1 ELSE 0 END) AS download_cnt,
-      MAX(CASE WHEN e.event_type = 'view' THEN e.created_at END) AS last_view_at
+
+      -- ✅ 미리보기 수: FC 기준 · 하루 1회
+      COUNT(
+        DISTINCT
+        CASE
+          WHEN e.event_type = 'view'
+           AND e.actor_type = 'fc'
+          THEN e.actor_id || DATE(e.created_at, '+9 hours')
+        END
+      ) AS view_cnt,
+
+      -- ✅ 다운로드 수: FC 기준 전체
+      COUNT(
+        CASE
+          WHEN e.event_type LIKE '%download%'
+           AND e.actor_type = 'fc'
+          THEN 1
+        END
+      ) AS download_cnt,
+
+      -- ✅ 최근 미리보기 시각 (FC 기준)
+      MAX(
+        CASE
+          WHEN e.event_type = 'view'
+           AND e.actor_type = 'fc'
+          THEN e.created_at
+        END
+      ) AS last_view_at
+
     FROM report_issue i
     LEFT JOIN report_issue_event e
       ON i.compliance_code = e.compliance_code
@@ -141,6 +167,7 @@ def build_issue_log_csv(issues: list[dict]) -> bytes:
         ])
 
     return buf.getvalue().encode("utf-8-sig")  # 엑셀 한글 깨짐 방지
+
 
 def build_zip_from_issues(issues):
     zip_buf = BytesIO()
