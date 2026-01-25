@@ -287,6 +287,9 @@ if not rows:
 # =================================================
 # 4️⃣ 발행 목록 테이블
 # =================================================
+
+st.write("DEBUG TOKEN:", token)
+
 for r in rows:
     with st.container(border=True):
         c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 2, 2, 1, 1])
