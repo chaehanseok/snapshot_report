@@ -7,6 +7,8 @@ from io import BytesIO
 
 from utils.auth import verify_token
 from utils.r2 import generate_presigned_pdf_url
+import csv
+
 
 
 # =================================================
@@ -76,6 +78,79 @@ def d1_query(sql: str, params: list):
     data = r.json()
     return data["result"][0]["results"] if data.get("result") else []
 
+def build_issue_log_csv(issues: list[dict]) -> bytes:
+    """
+    조회된 발행 목록 기준 로그 CSV 생성
+    """
+    if not issues:
+        return b""
+
+    codes = [r["compliance_code"] for r in issues]
+    placeholders = ",".join(["?"] * len(codes))
+
+    sql = f"""
+    SELECT
+      i.compliance_code,
+      i.fc_name,
+      i.customer_name,
+      i.customer_age_band,
+      i.created_at,
+      SUM(CASE WHEN e.event_type = 'view' THEN 1 ELSE 0 END) AS view_cnt,
+      SUM(CASE WHEN e.event_type LIKE '%download%' THEN 1 ELSE 0 END) AS download_cnt,
+      MAX(CASE WHEN e.event_type = 'view' THEN e.created_at END) AS last_view_at
+    FROM report_issue i
+    LEFT JOIN report_issue_event e
+      ON i.compliance_code = e.compliance_code
+    WHERE i.compliance_code IN ({placeholders})
+    GROUP BY
+      i.compliance_code,
+      i.fc_name,
+      i.customer_name,
+      i.customer_age_band,
+      i.created_at
+    ORDER BY i.created_at DESC;
+    """
+
+    rows = d1_query(sql, codes)
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+
+    writer.writerow([
+        "심의번호",
+        "FC명",
+        "고객명",
+        "연령대",
+        "발행일시",
+        "미리보기 수",
+        "다운로드 수",
+        "최근 미리보기 시각",
+    ])
+
+    for r in rows:
+        writer.writerow([
+            r["compliance_code"],
+            r["fc_name"],
+            r["customer_name"] or "",
+            r["customer_age_band"],
+            r["created_at"],
+            r["view_cnt"],
+            r["download_cnt"],
+            r["last_view_at"] or "",
+        ])
+
+    return buf.getvalue().encode("utf-8-sig")  # 엑셀 한글 깨짐 방지
+
+def build_zip_from_issues(issues):
+    zip_buf = BytesIO()
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for r in issues:
+            signed_url = generate_presigned_pdf_url(r["pdf_r2_key"])
+            resp = requests.get(signed_url, timeout=30)
+            if resp.ok:
+                z.writestr(r["pdf_filename"], resp.content)
+    zip_buf.seek(0)
+    return zip_buf.getvalue()
 
 # =================================================
 # 1️⃣ KPI 요약
@@ -216,38 +291,29 @@ st.divider()
 # =================================================
 st.subheader("📦 일괄 다운로드")
 
-def build_zip_from_issues(issues):
-    zip_buf = BytesIO()
-    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for r in issues:
-            signed_url = generate_presigned_pdf_url(r["pdf_r2_key"])
-            resp = requests.get(signed_url, timeout=30)
-            if resp.ok:
-                z.writestr(r["pdf_filename"], resp.content)
-    zip_buf.seek(0)
-    return zip_buf.getvalue()
+col_a, col_b = st.columns(2)
 
-if st.button("현재 조건 전체 ZIP 다운로드"):
-    with st.spinner("ZIP 생성 중..."):
-        zip_bytes = build_zip_from_issues(rows)
+with col_a:
+    if st.button("📄 조회 결과 PDF ZIP 다운로드"):
+        with st.spinner("PDF ZIP 생성 중..."):
+            zip_bytes = build_zip_from_issues(rows)
 
-        for r in rows:
-            d1_query(
-                """
-                INSERT INTO report_issue_event
-                (compliance_code, event_type, actor_type, actor_id)
-                VALUES (?, 'bulk_download', 'admin', ?);
-                """,
-                [r["compliance_code"], admin.get("id")],
+            st.download_button(
+                label="📥 PDF ZIP 다운로드",
+                data=zip_bytes,
+                file_name=f"reports_{ts}.zip",
+                mime="application/zip",
             )
 
-        ts = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y%m%d_%H%M")
+with col_b:
+    if st.button("📊 발행 로그 CSV 다운로드"):
+        csv_bytes = build_issue_log_csv(rows)
 
         st.download_button(
-            "📥 ZIP 다운로드",
-            zip_bytes,
-            file_name=f"reports_{ts}.zip",
-            mime="application/zip",
+            label="📥 CSV 다운로드",
+            data=csv_bytes,
+            file_name=f"report_logs_{ts}.csv",
+            mime="text/csv",
         )
 
 st.divider()
