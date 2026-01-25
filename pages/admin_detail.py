@@ -126,7 +126,7 @@ st.divider()
 # =================================================
 bucket = st.secrets["R2_BUCKET_NAME"]
 endpoint = st.secrets["R2_ENDPOINT"]
-pdf_url = generate_presigned_pdf_url(issue["pdf_r2_key"], expires=600)
+pdf_url = generate_presigned_pdf_url(issue["pdf_r2_key"])
 
 st.subheader("📎 PDF 문서")
 
