@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 import requests
 import zipfile
 from io import BytesIO
+from io import StringIO
 
 from utils.auth import verify_token
 from utils.r2 import generate_presigned_pdf_url
