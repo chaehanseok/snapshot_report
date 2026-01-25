@@ -133,7 +133,13 @@ st.subheader("📎 PDF 문서")
 c1, c2 = st.columns([1, 3])
 
 with c1:
-    st.link_button("🌐 브라우저로 열기", pdf_url)
+    st.download_button(
+        label="📄 PDF 열기",
+        data=requests.get(pdf_url, timeout=30).content,
+        file_name=issue["pdf_filename"],
+        mime="application/pdf",
+        use_container_width=True,
+    )
 
     # 🔹 PDF 미리보기 이벤트
     if st.button("👀 PDF 미리보기 기록"):
