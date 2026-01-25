@@ -107,7 +107,7 @@ st.divider()
 # =================================================
 st.subheader("🔎 발행 목록 필터")
 
-f1, f2, f3, f4 = st.columns(4)
+f1, f2, f3, f4, f5 = st.columns(5)
 
 with f1:
     fc_name = st.text_input("FC 이름")
@@ -123,6 +123,9 @@ with f3:
 
 with f4:
     date_from = st.date_input("시작일")
+
+with f5:
+    date_to = st.date_input("종료일")   # ✅ 이것만 추가
 
 where = ["1=1"]
 params = []
@@ -143,7 +146,13 @@ if date_from:
     where.append("DATE(created_at) >= ?")
     params.append(str(date_from))
 
+if date_to:
+    where.append("DATE(created_at) <= ?")
+    params.append(str(date_to))
 
+if date_from and date_to and date_from > date_to:
+    st.warning("종료일은 시작일 이후여야 합니다.")
+    st.stop()
 
 # =================================================
 # 3️⃣ 발행 목록 조회
