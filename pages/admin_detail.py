@@ -133,50 +133,32 @@ st.subheader("📎 PDF 문서")
 c1, c2 = st.columns([1, 3])
 
 with c1:
+    pdf_bytes = requests.get(pdf_url, timeout=30).content
+
     st.download_button(
         label="📄 PDF 열기",
-        data=requests.get(pdf_url, timeout=30).content,
+        data=pdf_bytes,
         file_name=issue["pdf_filename"],
         mime="application/pdf",
         use_container_width=True,
     )
 
-    # 🔹 PDF 미리보기 이벤트
-    if st.button("👀 PDF 미리보기 기록"):
-        d1_query(
-            """
-            INSERT INTO report_issue_event
-            (compliance_code, event_type, actor_type, actor_id)
-            VALUES (?, 'view', 'admin', ?);
-            """,
-            [code, admin.get("id")],
-        )
-        st.success("미리보기 이벤트 기록됨")
-
-    st.divider()
-
-    # 🔹 단건 다운로드
-    if st.button("📥 PDF 다운로드"):
-        pdf_bytes = requests.get(pdf_url, timeout=30).content
-
-        d1_query(
-            """
-            INSERT INTO report_issue_event
-            (compliance_code, event_type, actor_type, actor_id)
-            VALUES (?, 'download', 'admin', ?);
-            """,
-            [code, admin.get("id")],
-        )
-
-        st.download_button(
-            label="⬇️ 파일 저장",
-            data=pdf_bytes,
-            file_name=issue["pdf_filename"],
-            mime="application/pdf",
-        )
+    # 🔹 관리자 PDF 열기 = download 이벤트로 통일
+    d1_query(
+        """
+        INSERT INTO report_issue_event
+        (compliance_code, event_type, actor_type, actor_id)
+        VALUES (?, 'download', 'admin', ?);
+        """,
+        [code, admin.get("id")],
+    )
 
 with c2:
-    st.components.v1.iframe(pdf_url, height=720)
+    st.info(
+        "📌 보안 정책상 PDF는 브라우저 미리보기를 지원하지 않습니다.\n\n"
+        "위의 **PDF 열기** 버튼을 눌러 다운로드 후 확인해 주세요."
+    )
+
 
 st.divider()
 
