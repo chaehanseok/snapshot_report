@@ -292,6 +292,8 @@ st.divider()
 # =================================================
 st.subheader("📦 일괄 다운로드")
 
+ts = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y%m%d_%H%M")
+
 col_a, col_b = st.columns(2)
 
 with col_a:
