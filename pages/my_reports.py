@@ -62,31 +62,31 @@ def d1_query(sql: str, params: list):
 
     return data["result"][0]["results"] if data.get("result") else []
 
-def insert_view_once_per_day(compliance_code: str, fc_code: str):
-    exists = d1_query(
-        """
-        SELECT 1
-        FROM report_issue_event
-        WHERE
-          compliance_code = ?
-          AND event_type = 'view'
-          AND actor_type = 'fc'
-          AND actor_id = ?
-          AND DATE(created_at, '+9 hours') = DATE('now', '+9 hours')
-        LIMIT 1;
-        """,
-        [compliance_code, fc_code],
-    )
+# def insert_view_once_per_day(compliance_code: str, fc_code: str):
+#     exists = d1_query(
+#         """
+#         SELECT 1
+#         FROM report_issue_event
+#         WHERE
+#           compliance_code = ?
+#           AND event_type = 'view'
+#           AND actor_type = 'fc'
+#           AND actor_id = ?
+#           AND DATE(created_at, '+9 hours') = DATE('now', '+9 hours')
+#         LIMIT 1;
+#         """,
+#         [compliance_code, fc_code],
+#     )
 
-    if not exists:
-        d1_query(
-            """
-            INSERT INTO report_issue_event
-            (compliance_code, event_type, actor_type, actor_id)
-            VALUES (?, 'view', 'fc', ?);
-            """,
-            [compliance_code, fc_code],
-        )
+#     if not exists:
+#         d1_query(
+#             """
+#             INSERT INTO report_issue_event
+#             (compliance_code, event_type, actor_type, actor_id)
+#             VALUES (?, 'view', 'fc', ?);
+#             """,
+#             [compliance_code, fc_code],
+#         )
 
 
 # =================================================
@@ -212,39 +212,23 @@ for r in rows:
 
     # 🔹 다운로드 상태 판단
     downloaded = r["compliance_code"] not in pending_codes
-    status = "⬇ 다운로드 완료" if downloaded else "👁 미리보기만 함"
+    status = "⬇ 다운로드 완료" if downloaded else "⬇ 다운로드 필요"
 
     with st.container(border=True):
-        c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 1, 2, 1.2, 1.2])
+        c1, c2, c3, c4, c5 = st.columns([3, 2, 1, 2, 1.5])
 
         # 🔹 심의번호 + 상태
         c1.markdown(f"**{r['compliance_code']}**")
-        c1.caption(status)
+        c1.caption(status)  # ⬇ 다운로드 완료 / ⬇ 미다운로드
 
         c2.write(r["customer_name"] or "-")
         c3.write(r["customer_age_band"])
         c4.write(r["created_at"][:16])
 
-        # 👁 미리보기 (새 창)
+        # ⬇ 다운로드 (유일한 액션)
         with c5:
-            if st.button(
-                "👁 미리보기",
-                use_container_width=True,
-                key=f"view_{r['compliance_code']}",
-            ):
-                insert_view_once_per_day(
-                    compliance_code=r["compliance_code"],
-                    fc_code=fc["fc_code"],
-                )
-                st.markdown(
-                    f"<a href='{pdf_url}' target='_blank'></a>",
-                    unsafe_allow_html=True,
-                )
-
-        # ⬇ 다운로드
-        with c6:
             st.download_button(
-                label="⬇ 다운로드",
+                label="⬇ PDF 다운로드",
                 data=requests.get(pdf_url, timeout=30).content,
                 file_name=r["pdf_filename"],
                 mime="application/pdf",
