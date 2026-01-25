@@ -287,9 +287,6 @@ if not rows:
 # =================================================
 # 4️⃣ 발행 목록 테이블
 # =================================================
-
-st.write("DEBUG TOKEN:", token)
-
 for r in rows:
     with st.container(border=True):
         c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 2, 2, 1, 1])
@@ -300,11 +297,12 @@ for r in rows:
         c4.write(r["customer_age_band"])
 
         with c5:
-            st.link_button(
-                "상세",
-                f"/admin_issue_detail?code={r['compliance_code']}&token={token}",
-                use_container_width=True,
+            detail_url = (
+                f"/admin_detail"
+                f"?code={r['compliance_code']}"
+                f"&token={token}"
             )
+            st.link_button("상세", detail_url)
 
         with c6:
             pdf_url = generate_presigned_pdf_url(r["pdf_r2_key"])
