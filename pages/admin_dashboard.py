@@ -98,8 +98,10 @@ def build_issue_log_csv(issues: list[dict]) -> bytes:
       i.created_at,
       COUNT(
         CASE
-          WHEN e.event_type LIKE '%download%'
-          THEN 1
+            WHEN e.event_type LIKE '%download%'
+            AND e.actor_type = 'fc'
+            AND e.actor_id = i.fc_id
+            THEN 1
         END
       ) AS download_cnt
     FROM report_issue i
@@ -224,6 +226,8 @@ if download_status == "다운로드완료":
           FROM report_issue_event e
           WHERE e.compliance_code = i.compliance_code
             AND e.event_type LIKE '%download%'
+            AND e.actor_type = 'fc'
+            AND e.actor_id = i.fc_id
         )
     """)
 
@@ -234,6 +238,8 @@ elif download_status == "다운로드필요":
           FROM report_issue_event e
           WHERE e.compliance_code = i.compliance_code
             AND e.event_type LIKE '%download%'
+            AND e.actor_type = 'fc'
+            AND e.actor_id = i.fc_id
         )
     """)
 
@@ -297,6 +303,8 @@ SELECT
       FROM report_issue_event e
       WHERE e.compliance_code = i.compliance_code
         AND e.event_type LIKE '%download%'
+        AND e.actor_type = 'fc'
+        AND e.actor_id = i.fc_id      -- ✅ 이게 핵심(발행한 FC 기준)
     )
     THEN 1 ELSE 0
   END AS is_downloaded
