@@ -327,6 +327,7 @@ def publish_report(
     sort_key: str,
     min_prev_100k: float,
     min_cpp_manwon: int,
+    issue_fingerprint: str,   # ⭐ 추가
 ) -> str:
     """
     리포트 공식 발행 처리 (동시성 안전)
@@ -366,6 +367,7 @@ def publish_report(
                 pdf_filename=pdf_filename,
                 compliance_code=compliance_code,
                 segments_version=segments_version,
+                issue_fingerprint=issue_fingerprint,  # ⭐ 여기
             )
 
             # ✅ 성공
