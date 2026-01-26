@@ -1041,14 +1041,26 @@ if token_exp:
 else:
     exp_text = "\n🔐 토큰 만료 시각(KST): 만료 정보 없음"
 
-st.success("미래에셋금융서비스 소속 인증 완료")
-
 st.markdown(
-    f"<span style='color:#555;font-size:0.9rem;'>"
-    f"🔐 토큰 만료 시각(KST): <b>{exp_kst}</b>"
-    f"</span>",
-    unsafe_allow_html=True
+    f"""
+    <div style="
+        background-color:#e6f4ea;
+        border-left:6px solid #2e7d32;
+        padding:14px 16px;
+        border-radius:6px;
+        margin-bottom:12px;
+    ">
+        <div style="font-weight:600; font-size:1rem; color:#1b5e20;">
+            미래에셋금융서비스 소속 인증 완료
+        </div>
+        <div style="margin-top:6px; font-size:0.9rem; color:#2e7d32;">
+            🔐 토큰 만료 시각(KST): <b>{exp_kst}</b>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
+
 
 # st.write(f"FC명 : **{fc['name']}**")
 # st.write(f"소속 : **{planner_org_display}**")
@@ -1071,15 +1083,12 @@ st.markdown(
 #         "※ 본인이 발행한 보장점검 리포트의 발행 이력, PDF 열람 및 다운로드 내역을 확인할 수 있습니다."
 #     )
 
-col_left, col_right = st.columns([4, 1])
+info_col, btn_col = st.columns([4, 1])
 
-with col_left:
-    st.write(f"FC명 : **{fc['name']}**")
-    st.write(f"소속 : **{planner_org_display}**")
-    st.write(f"연락처 : **{planner_phone_display}**")
+with info_col:
+    st.markdown(f"**FC명 : {planner['name']}**")
 
-with col_right:
-    st.markdown("<br>", unsafe_allow_html=True)
+with btn_col:
     if st.button("📄 내 발행 이력", use_container_width=True):
         st.session_state["auth_token"] = token
         st.switch_page("pages/my_reports.py")
@@ -1088,6 +1097,10 @@ with col_right:
         "발행 이력 및 PDF 다운로드 내역을\n"
         "확인할 수 있습니다."
     )
+
+st.write(f"FC명 : **{fc['name']}**")
+st.write(f"소속 : **{planner_org_display}**")
+st.write(f"연락처 : **{planner_phone_display}**")
 
 st.divider()
 
