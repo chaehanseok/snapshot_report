@@ -78,6 +78,13 @@ def b64url_decode(s: str) -> bytes:
     s += "=" * (-len(s) % 4)
     return base64.urlsafe_b64decode(s.encode("utf-8"))
 
+def format_token_exp(exp: int | None) -> str:
+    if not exp:
+        return "만료 정보 없음"
+
+    dt = datetime.fromtimestamp(exp, tz=ZoneInfo("Asia/Seoul"))
+    return dt.strftime("%Y-%m-%d %H:%M")
+
 
 # =========================================================
 # Content loaders
@@ -1026,7 +1033,12 @@ segments_db = load_json(SEGMENTS_PATH)
 planner_org_display = org_display(BRAND_NAME, fc.get("org", ""))
 planner_phone_display = format_phone_3_4_4(fc["phone"])
 
+token_exp = user.get("exp")   # verify_token 결과에서
 st.success("미래에셋금융서비스 소속 인증 완료")
+st.caption(
+    f"🔐 토큰 만료 시각(KST): **{format_token_exp(token_exp)}**"
+)
+
 st.write(f"FC명 : **{fc['name']}**")
 st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
