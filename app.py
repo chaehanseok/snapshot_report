@@ -997,7 +997,7 @@ st.markdown(
 
 inject_global_css()   
 
-st.set_page_config(page_title="보장 점검 유인 팜플렛", layout="centered")
+st.set_page_config(page_title="보장 점검 유인 팜플렛",layout="wide", initial_sidebar_state="collapsed")
 
 token = get_auth_token()
 if not token:
