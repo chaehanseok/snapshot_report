@@ -984,6 +984,8 @@ def chromium_pdf_bytes(html: str) -> bytes:
 # =========================================================
 # Streamlit UI
 # =========================================================
+st.set_page_config(page_title="보장 점검 유인 팜플렛",layout="wide", initial_sidebar_state="collapsed")
+
 # ✅ 기본 Pages 네비 숨김 (가장 먼저)
 st.markdown(
     """
@@ -996,8 +998,6 @@ st.markdown(
 )
 
 inject_global_css()   
-
-st.set_page_config(page_title="보장 점검 유인 팜플렛",layout="wide", initial_sidebar_state="collapsed")
 
 token = get_auth_token()
 if not token:
