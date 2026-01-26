@@ -1507,12 +1507,16 @@ if "issued_compliance_code" not in st.session_state:
     st.session_state["issued_compliance_code"] = None
 
 
+
 btn_col, loading_col = st.columns([1, 3], vertical_alignment="center")
 
 with btn_col:
     issue_clicked = st.button(
         "심사요청",
-        disabled=st.session_state["issuing"],
+        disabled=(
+            st.session_state["issuing"]
+            or st.session_state["issued"]
+        ),
         use_container_width=True,
     )
 
@@ -1526,6 +1530,15 @@ with loading_col:
                     PDF 생성 및 심사 요청 처리 중입니다…
                 </span>
             </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    elif st.session_state["issued"]:
+        st.markdown(
+            f"""
+            <span style="color:#2e7d32; font-size:0.95rem;">
+                ✅ 발행 완료 · 심의번호: <b>{st.session_state["issued_compliance_code"]}</b>
+            </span>
             """,
             unsafe_allow_html=True,
         )
@@ -1557,40 +1570,15 @@ if issue_clicked:
         st.stop()
 
     st.session_state["issuing"] = True
-    st.session_state["issued"] = False
-    st.rerun()    
-    
-    # # 1️⃣ 발행번호 생성
-    # compliance_code = generate_compliance_code(
-    #     service_name="보장점검",
-    #     version=APP_VERSION,
-    # )
 
-    # # 2️⃣ PDF 전용 context 생성 (⭐ 여기!)
-    # pdf_context = copy.deepcopy(context)
-    # pdf_context["customer"]["name"] = customer_name.strip()
-    # pdf_context["segment"]["headline"] = segment["headline"].replace(
-    #     "{customer_name}", customer_name.strip()
-    # )
-    # pdf_context["compliance_code"] = (
-    #     f"{compliance_code} ({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
-    # )
-
-    # # 3️⃣ 세션에 저장 (rerun 대비)
-    # st.session_state["pdf_context"] = pdf_context
-    # st.session_state["compliance_code"] = compliance_code
-
-    # # 4️⃣ 로딩 시작
-    # st.session_state["issuing"] = True
-    # st.rerun()
-
-if st.session_state["issuing"]:
     try:
+        # 1️⃣ 발행번호
         compliance_code = generate_compliance_code(
             service_name="보장점검",
             version=APP_VERSION,
         )
 
+        # 2️⃣ PDF context
         pdf_context = copy.deepcopy(context)
         pdf_context["customer"]["name"] = customer_name.strip()
         pdf_context["segment"]["headline"] = segment["headline"].replace(
@@ -1600,9 +1588,11 @@ if st.session_state["issuing"]:
             f"{compliance_code} ({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
         )
 
+        # 3️⃣ PDF 생성
         pdf_html = build_final_html_for_both(pdf_context)
         pdf_bytes = chromium_pdf_bytes(pdf_html)
 
+        # 4️⃣ 발행 기록
         publish_report(
             pdf_bytes=pdf_bytes,
             compliance_code=compliance_code,
@@ -1626,10 +1616,10 @@ if st.session_state["issuing"]:
             actor_id=fc["fc_code"],
         )
 
-        # ✅ 결과 저장
+        # 5️⃣ 상태 저장
+        st.session_state["issued"] = True
         st.session_state["issued_pdf_bytes"] = pdf_bytes
         st.session_state["issued_compliance_code"] = compliance_code
-        st.session_state["issued"] = True
 
         st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
 
@@ -1637,9 +1627,7 @@ if st.session_state["issuing"]:
         st.error(f"발행 중 오류 발생:\n{e}")
 
     finally:
-        # ✅ 로딩 종료
         st.session_state["issuing"] = False
-        st.rerun()
 
 if st.session_state["issued"]:
     st.download_button(
