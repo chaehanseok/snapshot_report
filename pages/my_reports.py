@@ -200,8 +200,10 @@ if pending_rows:
             c3.write(r["customer_age_band"])
             c4.write(to_kst(r["created_at"]))
             c5.caption(
-                f"📊 통계기간: {r['start_year']} ~ {r['end_year']} | "
-                f"🔢 정렬기준: {r['sort_key']}"
+                f"""
+                📊 통계기간: **{r['start_year']} ~ {r['end_year']}**  
+                🔢 정렬기준: **{r['sort_key']}**
+                """
             )
             with c6:
                 st.download_button(
@@ -240,10 +242,11 @@ for r in rows:
         c3.write(r["customer_age_band"])
         c4.write(to_kst(r["created_at"]))
         c5.caption(
-            f"{status}\n"
-            f"📊 통계기간: {r['start_year']} ~ {r['end_year']} | "
-            f"🔢 정렬기준: {r['sort_key']}"
-        ) 
+            f"""
+            📊 통계기간: **{r['start_year']} ~ {r['end_year']}**  
+            🔢 정렬기준: **{r['sort_key']}**
+            """
+        )
 
         # ⬇ 다운로드 (유일한 액션)
         with c6:
