@@ -1022,7 +1022,7 @@ def chromium_pdf_bytes(html: str) -> bytes:
 # =========================================================
 # Streamlit UI
 # =========================================================
-st.set_page_config(page_title="보장 점검 유인 팜플렛",layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="보장분석 권유 리포트",layout="wide", initial_sidebar_state="collapsed")
 
 st.header("고객별 보장분석 권유 리포트 생성")
 
