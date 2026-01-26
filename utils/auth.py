@@ -40,20 +40,20 @@ def verify_token(token: str) -> dict:
     # if exp is not None and now > int(exp):
     #     raise ValueError("Token expired")
 
-    # role = payload.get("role", "fc")
+    role = payload.get("role", "fc")
 
-    # name = payload.get("name")
-    # if not name:
-    #     raise ValueError("Missing name")
+    name = payload.get("name")
+    if not name:
+        raise ValueError("Missing name")
 
-    # if role == "fc":
-    #     phone = payload.get("phone")
-    #     fc_code = payload.get("fc_code")
-    #     if not phone or not fc_code:
-    #         raise ValueError("Missing FC fields")
-    # else:  # admin
-    #     phone = payload.get("phone")
-    #     fc_code = None
+    if role == "fc":
+        phone = payload.get("phone")
+        fc_code = payload.get("fc_code")
+        if not phone or not fc_code:
+            raise ValueError("Missing FC fields")
+    else:  # admin
+        phone = payload.get("phone")
+        fc_code = None
 
     return {
         "name": name,
