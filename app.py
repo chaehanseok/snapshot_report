@@ -1019,7 +1019,7 @@ exp = user.get("exp")
 token_expired = exp is not None and now > exp
 
 if token_expired:
-    st.warning("⏰ 접속 토큰이 만료되었습니다. 재접속이 필요합니다.")
+    st.warning("⏰ 접속 토큰이 만료되었습니다. M.POST 게이트웨이 링크로 접속해 주세요.")
     st.stop()
 
 if user.get("role") == "admin":
