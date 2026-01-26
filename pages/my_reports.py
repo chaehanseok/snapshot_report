@@ -129,7 +129,7 @@ today = date.today()
 default_from = today.replace(day=1)
 
 with st.form("my_reports_filter_form"):
-    f1, f2, f3, f4, f5, f6 = st.columns([1, 1, 1, 1, 1, 0.5])
+    f1, f2, f3, f4, f5, f6 = st.columns([1, 1, 1, 1, 1, 1])
 
     with f1:
         f_customer = st.text_input("고객명")
