@@ -940,6 +940,23 @@ def insert_report_event(
     """
     d1_query(sql, [compliance_code, event_type, actor_type, actor_id])
 
+def get_auth_token() -> str | None:
+    # 1) 세션 우선
+    tok = st.session_state.get("auth_token")
+    if tok:
+        return tok
+
+    # 2) URL 쿼리 파라미터로 복구
+    tok = st.query_params.get("token")
+    if isinstance(tok, list):
+        tok = tok[0]
+
+    if tok:
+        st.session_state["auth_token"] = tok
+        return tok
+
+    return None
+
 
 # =========================================================
 # PDF generation (Chromium via Playwright)
@@ -969,10 +986,12 @@ def chromium_pdf_bytes(html: str) -> bytes:
 # =========================================================
 st.set_page_config(page_title="보장 점검 유인 팜플렛", layout="centered")
 
-token = st.query_params.get("token")
+token = get_auth_token()
 if not token:
     st.error("유효한 접속 정보가 없습니다. M.POST 게이트웨이 링크로 접속해 주세요.")
     st.stop()
+
+fc = verify_token(token)  # 여기서 검증
 
 try:
     planner = verify_token(token)
@@ -991,8 +1010,6 @@ st.write(f"FC명 : **{planner['name']}**")
 st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
 st.divider()
-
-token = st.query_params.get("token")
 
 c1, c2 = st.columns([1, 3])
 

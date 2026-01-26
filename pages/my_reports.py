@@ -9,6 +9,22 @@ def to_kst(ts: str) -> str:
     dt = datetime.fromisoformat(ts.replace("Z", ""))
     return dt.astimezone(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
 
+def get_auth_token() -> str | None:
+    # 1) 세션 우선
+    tok = st.session_state.get("auth_token")
+    if tok:
+        return tok
+
+    # 2) URL 쿼리 파라미터로 복구
+    tok = st.query_params.get("token")
+    if isinstance(tok, list):
+        tok = tok[0]
+
+    if tok:
+        st.session_state["auth_token"] = tok
+        return tok
+
+    return None
 
 # =================================================
 # Page Config (⚠️ 반드시 최상단)
@@ -21,10 +37,9 @@ st.set_page_config(
 # =================================================
 # 인증 (session_state 기반)
 # =================================================
-token = st.session_state.get("auth_token")
-
+token = get_auth_token()
 if not token:
-    st.error("접속 토큰이 없습니다. 처음 화면에서 다시 접속해 주세요.")
+    st.error("유효한 접속 정보가 없습니다. M.POST 게이트웨이 링크로 접속해 주세요.")
     st.stop()
 
 try:
@@ -116,12 +131,15 @@ st.caption(f"기준 시각(KST): {kst_now}")
 
 st.divider()
 
-col_left, col_right = st.columns([6, 1])
+col_left, col_right = st.columns([1, 6])
+with col_left:
+    if st.button("🏠 메인으로", use_container_width=True):
+        # URL에 token을 다시 주입 (세션이 날아가도 메인이 복구 가능)
+        st.query_params["token"] = token
 
-with col_right:
-    if st.button("🏠 메인으로 돌아가기", use_container_width=True):
+        # 메인 페이지로 이동 (파일 경로는 프로젝트에 맞게)
         st.switch_page("app.py")
-        
+
 # =================================================
 # 1️⃣ 조회 필터
 # =================================================
