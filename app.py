@@ -1091,7 +1091,11 @@ with info_col:
     st.markdown(f"연락처 : **{planner_phone_display}**")
 
 with btn_col:
-    if st.button("📄 내 발행 이력", use_container_width=True):
+    if st.button("📄 내 발행 이력", use_container_width=True, help=(
+    "본인이 발행한 보장점검 리포트의\n"
+    "발행 이력 및 PDF 다운로드 내역을\n"
+    "확인할 수 있습니다."
+)):
         st.session_state["auth_token"] = token
         st.switch_page("pages/my_reports.py")
     st.caption(
