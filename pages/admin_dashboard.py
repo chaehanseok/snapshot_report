@@ -257,6 +257,20 @@ if date_from and date_to and date_from > date_to:
     st.warning("종료일은 시작일 이후여야 합니다.")
     st.stop()
 
+# ==========================
+# 조회 버튼
+# ==========================
+if "searched" not in st.session_state:
+    st.session_state["searched"] = False
+
+st.markdown("")
+if st.button("🔍 조회", use_container_width=True):
+    st.session_state["searched"] = True
+
+if not st.session_state["searched"]:
+    st.info("조건을 입력한 후 [조회] 버튼을 눌러주세요.")
+    st.stop()
+
 # =================================================
 # 3️⃣ 발행 목록 조회
 # =================================================
