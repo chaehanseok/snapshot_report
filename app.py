@@ -1427,26 +1427,14 @@ final_html = build_final_html_for_both(context)
 
 st.subheader("미리보기")
 
-st.markdown(
-    """
-    <style>
-    .preview-wrapper {
-        display: flex;
-        justify-content: center;
-        width: 100%;
-    }
-    .preview-wrapper iframe {
-        max-width: 900px;   /* A4 기준 */
-        width: 100%;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+left, center, right = st.columns([1, 6, 1])
 
-st.markdown('<div class="preview-wrapper">', unsafe_allow_html=True)
-components.html(final_html, height=900, scrolling=True)
-st.markdown('</div>', unsafe_allow_html=True)
+with center:
+    components.html(
+        final_html,
+        height=900,
+        scrolling=True,
+    )
 
 st.divider()
 st.subheader("심사요청 (자동) 및 PDF 출력")
