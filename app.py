@@ -1535,16 +1535,13 @@ if (
     st.session_state["issued_compliance_code"] = None
     st.session_state["last_issue_fingerprint"] = None
 
-btn_col, status_col = st.columns([1, 3], vertical_alignment="center")
+btn_col, _ = st.columns([1, 3])
 
 with btn_col:
-    issue_clicked = st.button(
+    st.button(
         "심사요청",
+        disabled=st.session_state["issuing"] or st.session_state["issued"],
         use_container_width=True,
-        disabled=(
-            st.session_state["issuing"]
-            or st.session_state["issued"]
-        ),
     )
 
 with status_col:
@@ -1659,34 +1656,43 @@ if st.session_state["issuing"] and not st.session_state["issued"]:
 # PDF 다운로드
 # =========================================================
 if st.session_state["issued"]:
+    st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+
     st.markdown(
         f"""
         <div style="
-            margin-top:12px;
-            padding:10px 12px;
             background:#e6f4ea;
-            border-left:5px solid #2e7d32;
-            border-radius:6px;
-            color:#1b5e20;
-            font-size:0.95rem;
+            border-left:6px solid #2e7d32;
+            padding:14px 16px;
+            border-radius:8px;
         ">
-            ✅ 발행 완료 · 심의번호:
-            <b>{st.session_state["issued_compliance_code"]}</b>
+            <div style="font-size:0.95rem; color:#1b5e20; font-weight:600;">
+                ✅ 발행 완료 · 심의번호
+            </div>
+            <div style="margin-top:4px; font-size:0.9rem;">
+                <b>{st.session_state["issued_compliance_code"]}</b>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
 
     st.download_button(
         label="📄 심사완료된 PDF 다운로드",
         data=st.session_state["issued_pdf_bytes"],
         file_name=f"{st.session_state['issued_compliance_code']}.pdf",
         mime="application/pdf",
+        disabled=st.session_state.get("downloaded", False),
         use_container_width=False,
-        on_click=lambda: insert_report_event(
-            compliance_code=st.session_state["issued_compliance_code"],
-            event_type="download",
-            actor_type="fc",
-            actor_id=fc["fc_code"],
+        on_click=lambda: (
+            insert_report_event(
+                compliance_code=st.session_state["issued_compliance_code"],
+                event_type="download",
+                actor_type="fc",
+                actor_id=fc["fc_code"],
+            ),
+            st.session_state.__setitem__("downloaded", True),
         ),
     )
