@@ -1535,8 +1535,6 @@ if (
     st.session_state["issued_compliance_code"] = None
     st.session_state["last_issue_fingerprint"] = None
 
-st.subheader("심사요청 (자동) 및 PDF 출력")
-
 btn_col, loading_col = st.columns([1, 3], vertical_alignment="center")
 
 with btn_col:
@@ -1602,7 +1600,9 @@ if issue_clicked:
         st.stop()
 
     st.session_state["issuing"] = True
+    st.rerun()
 
+if st.session_state["issuing"] and not st.session_state["issued"]:
     try:
         # 1️⃣ 발행번호
         compliance_code = generate_compliance_code(
