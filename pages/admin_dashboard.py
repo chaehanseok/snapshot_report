@@ -283,6 +283,9 @@ SELECT
   fc_name,
   customer_name,
   customer_age_band,
+  start_year,
+  end_year,
+  sort_key,
   created_at,
   pdf_r2_key,
   pdf_filename
@@ -381,28 +384,27 @@ st.subheader("📋 발행 목록")
 
 for r in rows:
     with st.container(border=True):
-        c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 2, 2, 1, 1])
+        c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 3, 1.5])
 
+        # 심의번호
         c1.markdown(f"**{r['compliance_code']}**")
+
+        # FC / 고객
         c2.write(r["fc_name"])
         c3.write(r["customer_name"] or "-")
-        c4.write(r["customer_age_band"])
 
+        # 📊 통계 메타
+        c4.markdown(
+            f"""
+            📊 통계기간: **{r['start_year']} ~ {r['end_year']}**  
+            🔢 정렬기준: **{r['sort_key']}**
+            """
+        )
+
+        # PDF
         with c5:
-            detail_url = (
-                f"/admin_detail"
-                f"?code={r['compliance_code']}"
-                f"&token={token}"
-            )
-            st.link_button("상세", detail_url)
-
-        with c6:
             pdf_url = generate_presigned_pdf_url(r["pdf_r2_key"])
-            st.link_button(
-                "PDF",
-                pdf_url,
-                use_container_width=True,
-            )
+            st.link_button("PDF", pdf_url, use_container_width=True)
 
 st.divider()
 
