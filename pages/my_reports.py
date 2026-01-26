@@ -141,7 +141,7 @@ with st.form("my_reports_filter_form"):
         )
 
     with f3:
-        date_from = st.date_input(
+        f_from = st.date_input(
             "시작일",
             value=default_from
         )
@@ -168,7 +168,7 @@ if not search_clicked:
     st.stop()
 
 # ✅ 날짜 검증 (여기서 안전)
-if date_from and f_to and date_from > f_to:
+if f_from and f_to and f_from > f_to:
     st.warning("종료일은 시작일 이후여야 합니다.")
     st.stop()
 
