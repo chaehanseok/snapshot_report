@@ -1544,19 +1544,18 @@ with btn_col:
         use_container_width=True,
     )
 
-with status_col:
-    if st.session_state["issuing"]:
-        st.markdown(
-            """
-            <div style="display:flex; align-items:center; gap:8px;">
-                <div class="loader"></div>
-                <span style="color:#666; font-size:0.95rem;">
-                    PDF 생성 및 심사 요청 처리 중입니다…
-                </span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+if st.session_state["issuing"]:
+    st.markdown(
+        """
+        <div style="display:flex; align-items:center; gap:8px;">
+            <div class="loader"></div>
+            <span style="color:#666; font-size:0.95rem;">
+                PDF 생성 및 심사 요청 처리 중입니다…
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     
 # 로딩 애니메이션 CSS
 st.markdown(
