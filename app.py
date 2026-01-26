@@ -1033,6 +1033,7 @@ segments_db = load_json(SEGMENTS_PATH)
 planner_org_display = org_display(BRAND_NAME, fc.get("org", ""))
 planner_phone_display = format_phone_3_4_4(fc["phone"])
 
+st.write("DEBUG token payload:", user)
 token_exp = user.get("exp")   # verify_token 결과에서
 st.success("미래에셋금융서비스 소속 인증 완료")
 st.caption(
