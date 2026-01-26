@@ -373,6 +373,9 @@ st.divider()
 
 df = pd.DataFrame(rows)
 
+st.write(df[["created_at"]].head())
+st.write(df.dtypes)
+
 df["created_date"] = pd.to_datetime(df["created_at"]).dt.date
 
 daily_df = (
