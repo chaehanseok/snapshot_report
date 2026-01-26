@@ -1039,11 +1039,11 @@ st.success("미래에셋금융서비스 소속 인증 완료")
 
 token_exp = user.get("exp")   # verify_token 결과에서
 if token_exp:
-    exp_kst = datetime.fromtimestamp(exp, ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
+    exp_kst = datetime.fromtimestamp(token_exp, ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
     st.caption(f"🔐 토큰 만료 시각(KST): {exp_kst}")
 else:
     st.caption("🔐 토큰 만료 시각: 만료 정보 없음")
-    
+
 st.write(f"FC명 : **{fc['name']}**")
 st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
