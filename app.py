@@ -1074,7 +1074,7 @@ st.markdown(
 col_left, col_right = st.columns([4, 1])
 
 with col_left:
-    st.write(f"FC명 : **{planner['name']}**")
+    st.write(f"FC명 : **{fc['name']}**")
     st.write(f"소속 : **{planner_org_display}**")
     st.write(f"연락처 : **{planner_phone_display}**")
 
