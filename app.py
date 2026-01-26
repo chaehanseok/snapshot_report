@@ -1430,19 +1430,11 @@ st.subheader("미리보기")
 left, center, right = st.columns([1, 6, 1])
 
 with center:
-    st.markdown(
-        """
-        <style>
-        iframe {
-            box-shadow: 0 0 18px rgba(0,0,0,0.15);
-            background: white;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
+    components.html(
+        final_html,
+        height=900,
+        scrolling=True,
     )
-
-    components.html(final_html, height=900, scrolling=True)
 
 st.divider()
 st.subheader("심사요청 (자동) 및 PDF 출력")
