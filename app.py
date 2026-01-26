@@ -1097,33 +1097,33 @@ with st.container():
 
     info_col, btn_col = st.columns([4, 1.5], vertical_alignment="center")
 
-    with info_col:
-        st.markdown(
-            f"""
-            <div style="line-height:1.5;">
-                <div style="font-weight:700; color:#F58220; margin-bottom:6px;">
-                    👤 FC 정보
+        with info_col:
+            st.markdown(
+                f"""
+                <div style="line-height:1.5;">
+                    <div style="font-weight:700; color:#F58220; margin-bottom:6px;">
+                        👤 FC 정보
+                    </div>
+                    <div><b>FC명</b> : {fc['name']}</div>
+                    <div><b>소속</b> : {planner_org_display}</div>
+                    <div><b>연락처</b> : {planner_phone_display}</div>
                 </div>
-                <div><b>FC명</b> : {fc['name']}</div>
-                <div><b>소속</b> : {planner_org_display}</div>
-                <div><b>연락처</b> : {planner_phone_display}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                """,
+                unsafe_allow_html=True,
+            )
 
-    with btn_col:
-        if st.button(
-            "📄 내 발행 이력",
-            use_container_width=True,
-            help=(
-                "본인이 발행한 보장점검 리포트의\n"
-                "발행 이력 및 PDF 다운로드 내역을\n"
-                "확인할 수 있습니다."
-            ),
-        ):
-            st.session_state["auth_token"] = token
-            st.switch_page("pages/my_reports.py")
+        with btn_col:
+            if st.button(
+                "📄 내 발행 이력",
+                use_container_width=True,
+                help=(
+                    "본인이 발행한 보장점검 리포트의\n"
+                    "발행 이력 및 PDF 다운로드 내역을\n"
+                    "확인할 수 있습니다."
+                ),
+            ):
+                st.session_state["auth_token"] = token
+                st.switch_page("pages/my_reports.py")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
