@@ -55,7 +55,7 @@ if not token:
     st.stop()
 
 try:
-    fc = verify_token(token)
+    admin = verify_token(token)
 
 except Exception as e:
     st.error("❌ 관리자 인증 실패")
