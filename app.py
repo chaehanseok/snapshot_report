@@ -1086,7 +1086,7 @@ st.markdown(
 info_col, btn_col = st.columns([4, 1])
 
 with info_col:
-    st.markdown(f"**FC명 : {planner['name']}**")
+    st.markdown(f"**FC명 : {fc['name']}**")
 
 with btn_col:
     if st.button("📄 내 발행 이력", use_container_width=True):
