@@ -125,8 +125,11 @@ st.subheader("🔎 조회 필터")
 if "searched" not in st.session_state:
     st.session_state["searched"] = False
 
+today = date.today()
+default_from = today.replace(day=1)
+
 with st.form("my_reports_filter_form"):
-    f1, f2, f3, f4, f5, f6 = st.columns([2, 1.5, 1.5, 1.5, 1.5, 1])
+    f1, f2, f3, f4, f5, f6 = st.columns([1, 1, 1, 1, 1, 0.5])
 
     with f1:
         f_customer = st.text_input("고객명")
@@ -137,9 +140,6 @@ with st.form("my_reports_filter_form"):
             ["전체", "20대", "30대", "40대", "50대", "60대", "70대"],
         )
 
-    today = date.today()
-    default_from = today.replace(day=1)
-
     with f3:
         date_from = st.date_input(
             "시작일",
@@ -147,7 +147,10 @@ with st.form("my_reports_filter_form"):
         )
 
     with f4:
-        f_to = st.date_input("종료일")
+        f_to = st.date_input(
+            "종료일",
+            value=today
+        )
 
     with f5:
         f_dl = st.selectbox(
@@ -159,15 +162,13 @@ with st.form("my_reports_filter_form"):
         st.markdown("<br>", unsafe_allow_html=True)
         search_clicked = st.form_submit_button("🔍 조회", use_container_width=True)
 
-if search_clicked:
-    st.session_state["searched"] = True
-
-if not st.session_state["searched"]:
+# ✅ 조회 버튼 눌린 뒤만 진행
+if not search_clicked:
     st.info("조건을 입력한 후 [조회] 버튼을 눌러주세요.")
     st.stop()
 
-# 날짜 검증은 버튼 이후에
-if f_from and f_to and f_from > f_to:
+# ✅ 날짜 검증 (여기서 안전)
+if date_from and f_to and date_from > f_to:
     st.warning("종료일은 시작일 이후여야 합니다.")
     st.stop()
 

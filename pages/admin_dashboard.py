@@ -231,7 +231,11 @@ with f4:
     )
 
 with f5:
-    date_to = st.date_input("종료일")   # ✅ 이것만 추가
+    date_to = st.date_input(
+            "종료일",
+            value=today
+    )
+
 
 with f6:
     download_status = st.selectbox(
