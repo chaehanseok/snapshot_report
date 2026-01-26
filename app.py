@@ -1538,11 +1538,17 @@ if (
 btn_col, _ = st.columns([1, 3])
 
 with btn_col:
-    st.button(
+    if st.button(
         "심사요청",
         disabled=st.session_state["issuing"] or st.session_state["issued"],
         use_container_width=True,
-    )
+    ):
+        if not customer_name.strip():
+            st.warning("고객 성명을 입력해 주세요.")
+            st.stop()
+
+        st.session_state["issuing"] = True
+        st.rerun()
 
 if st.session_state["issuing"]:
     st.markdown(
@@ -1581,13 +1587,6 @@ st.markdown(
 # =========================================================
 # 심사요청 실행
 # =========================================================
-if issue_clicked:
-    if not customer_name.strip():
-        st.warning("고객 성명을 입력해 주세요.")
-        st.stop()
-
-    st.session_state["issuing"] = True
-    st.rerun()
 
 if st.session_state["issuing"] and not st.session_state["issued"]:
     try:
