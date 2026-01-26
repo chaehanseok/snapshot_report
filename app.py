@@ -993,6 +993,8 @@ def chromium_pdf_bytes(html: str) -> bytes:
 # =========================================================
 st.set_page_config(page_title="보장 점검 유인 팜플렛",layout="wide", initial_sidebar_state="collapsed")
 
+st.header("고객별 보장분석 권유 리포트 생성")
+
 # ✅ 기본 Pages 네비 숨김 (가장 먼저)
 st.markdown(
     """
@@ -1071,37 +1073,45 @@ st.markdown(
 )
 
 
-st.markdown(
-    f"""
-    <div style="
-        background-color:#FFF3E8;
-        border-left:6px solid #F58220;
-        padding:16px 18px;
-        border-radius:10px;
-        line-height:1.5;
-    ">
-        <div style="font-weight:700; color:#F58220; margin-bottom:6px;">
-            👤 FC 정보
+with st.container():
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#FFF3E8;
+            border-left:6px solid #F58220;
+            padding:16px 18px;
+            border-radius:10px;
+            line-height:1.5;
+            margin-bottom:10px;
+        ">
+            <div style="font-weight:700; color:#F58220; margin-bottom:6px;">
+                👤 FC 정보
+            </div>
+            <div><b>FC명</b> : {fc['name']}</div>
+            <div><b>소속</b> : {planner_org_display}</div>
+            <div><b>연락처</b> : {planner_phone_display}</div>
         </div>
-        <div><b>FC명</b> : {fc['name']}</div>
-        <div><b>소속</b> : {planner_org_display}</div>
-        <div><b>연락처</b> : {planner_phone_display}</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+        """,
+        unsafe_allow_html=True,
+    )
 
-if st.button(
-    "📄 내 발행 이력",
-    use_container_width=True,
-    help=(
-        "본인이 발행한 보장점검 리포트의\n"
-        "발행 이력 및 PDF 다운로드 내역을\n"
-        "확인할 수 있습니다."
-    ),
-):
-    st.session_state["auth_token"] = token
-    st.switch_page("pages/my_reports.py")
+
+with st.container():
+    # 위 여백만 살짝
+    st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
+
+    if st.button(
+        "📄 내 발행 이력",
+        use_container_width=True,
+        help=(
+            "본인이 발행한 보장점검 리포트의\n"
+            "발행 이력 및 PDF 다운로드 내역을\n"
+            "확인할 수 있습니다."
+        ),
+    ):
+        st.session_state["auth_token"] = token
+        st.switch_page("pages/my_reports.py")
+
 
 st.divider()
 
