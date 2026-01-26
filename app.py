@@ -1091,23 +1091,24 @@ with info_col:
             border-left:6px solid #F58220;
             padding:12px 16px;
             border-radius:6px;
-            line-height:1.45;
+            line-height:1.35;
+            font-size:14px;
+            color:#333;
         ">
-            <div style="font-weight:700; color:#F58220; margin-bottom:4px;">
+            <div style="font-weight:700; color:#F58220; margin-bottom:6px;">
                 👤 FC 정보
             </div>
-            <div style="color:#333333; font-size:14px;">
-                <div><strong>FC명</strong> : {fc['name']}</div>
-                <div><strong>소속</strong> : {planner_org_display}</div>
-                <div><strong>연락처</strong> : {planner_phone_display}</div>
-            </div>
+            <div><b>FC명</b> : {fc['name']}</div>
+            <div><b>소속</b> : {planner_org_display}</div>
+            <div><b>연락처</b> : {planner_phone_display}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 with btn_col:
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)  # 🔹 미세 높이 보정
+    # FC 정보 첫 줄과 버튼 높이 맞추기
+    st.markdown("<div style='height:34px'></div>", unsafe_allow_html=True)
 
     if st.button(
         "📄 내 발행 이력",
@@ -1120,13 +1121,6 @@ with btn_col:
     ):
         st.session_state["auth_token"] = token
         st.switch_page("pages/my_reports.py")
-
-    st.caption(
-        "본인이 발행한 보장점검 리포트의\n"
-        "발행 이력 및 PDF 다운로드 내역을\n"
-        "확인할 수 있습니다."
-    )
-
 
 st.divider()
 
