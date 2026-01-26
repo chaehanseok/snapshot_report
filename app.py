@@ -1089,6 +1089,8 @@ with col_right:
         "확인할 수 있습니다."
     )
 
+st.divider()
+
 # st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
 # st.write("KST 오늘 날짜:", today_kst_date_str())
 # st.write("오늘 발행 건수:", get_today_report_issue_count())
@@ -1274,7 +1276,7 @@ if emerging_rows:
 else:
     st.info("현재 Top15에 없는 ‘신규 부각 질병’이 없습니다. (현재와 이후가 유사한 패턴)")
 
-st.markdown("---")
+st.divider()
 
 # =========================================================
 # 문구 커스터마이징 + HTML/PDF 미리보기/출력
