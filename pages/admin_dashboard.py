@@ -12,6 +12,10 @@ import csv
 import pandas as pd
 
 
+def to_kst(ts: str) -> str:
+    dt = datetime.fromisoformat(ts.replace("Z", ""))
+    return dt.astimezone(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
+
 # =================================================
 # Page Config (⚠️ 반드시 최상단, 1회만)
 # =================================================
@@ -402,7 +406,7 @@ st.subheader("📋 발행 목록")
 
 for r in rows:
     with st.container(border=True):
-        c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 3, 1.5])
+        c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 1, 2, 2, 1.5])
 
         status_label = (
             "⬇ 다운로드 완료" if r["is_downloaded"]
@@ -417,9 +421,10 @@ for r in rows:
         # FC / 고객
         c2.write(r["fc_name"])
         c3.write(r["customer_name"] or "-")
+        c4.write(to_kst(r["created_at"]))
 
         # 📊 통계 메타
-        c4.markdown(
+        c5.markdown(
             f"""
             📊 통계기간: **{r['start_year']} ~ {r['end_year']}**  
             🔢 정렬기준: **{r['sort_key']}**
@@ -427,7 +432,7 @@ for r in rows:
         )
 
         # PDF
-        with c5:
+        with c6:
             pdf_url = generate_presigned_pdf_url(r["pdf_r2_key"])
             st.link_button("PDF", pdf_url, use_container_width=True)
 
