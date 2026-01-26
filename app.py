@@ -1020,6 +1020,7 @@ token_expired = exp is not None and now > exp
 
 if token_expired:
     st.warning("⏰ 접속 토큰이 만료되었습니다. 재접속이 필요합니다.")
+    st.stop()
 
 if user.get("role") == "admin":
     st.info("관리자 계정으로 접속했습니다.")
