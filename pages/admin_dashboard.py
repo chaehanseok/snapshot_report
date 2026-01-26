@@ -16,6 +16,24 @@ def to_kst(ts: str) -> str:
     dt = datetime.fromisoformat(ts.replace("Z", ""))
     return dt.astimezone(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
 
+def get_auth_token() -> str | None:
+    # 1) 세션 우선
+    tok = st.session_state.get("auth_token")
+    if tok:
+        return tok
+
+    # 2) URL 쿼리 파라미터로 복구
+    tok = st.query_params.get("token")
+    if isinstance(tok, list):
+        tok = tok[0]
+
+    if tok:
+        st.session_state["auth_token"] = tok
+        return tok
+
+    return None
+
+
 # =================================================
 # Page Config (⚠️ 반드시 최상단, 1회만)
 # =================================================
@@ -31,18 +49,14 @@ st.caption("관리자 전용 발행 관리 화면입니다.")
 # =================================================
 # 0️⃣ 관리자 인증
 # =================================================
-token = st.query_params.get("token")
-
+token = get_auth_token()
 if not token:
-    st.error("❌ 관리자 토큰이 없습니다.")
-    st.info("정상적인 관리자 링크로 접속해 주세요.")
+    st.error("유효한 접속 정보가 없습니다. M.POST 게이트웨이 링크로 접속해 주세요.")
     st.stop()
 
-if isinstance(token, list):
-    token = token[0]
-
 try:
-    admin = verify_token(token)
+    fc = verify_token(token)
+
 except Exception as e:
     st.error("❌ 관리자 인증 실패")
     st.code(str(e))
