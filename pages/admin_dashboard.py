@@ -11,6 +11,7 @@ from utils.r2 import generate_presigned_pdf_url
 import csv
 import pandas as pd
 from datetime import date
+from utils.ui_common import inject_global_css, cleanup_token_timer_overlay, inject_base_css_only
 
 
 def to_kst(ts: str) -> str:
@@ -38,13 +39,23 @@ def get_auth_token() -> str | None:
 # =================================================
 # Page Config (⚠️ 반드시 최상단, 1회만)
 # =================================================
-st.set_page_config(
-    page_title="관리자 · 발행 대시보드",
-    layout="wide",
-)
+st.set_page_config(page_title="관리자 · 발행 대시보드",layout="wide", initial_sidebar_state="collapsed")
 
 st.title("🛠 관리자 페이지")
 st.caption("관리자 전용 발행 관리 화면입니다.")
+
+# ✅ 기본 Pages 네비 숨김 (가장 먼저)
+st.markdown(
+    """
+    <style>
+      [data-testid="stSidebarNav"] { display: none !important; }
+      [data-testid="stSidebarNavSeparator"] { display: none !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+inject_base_css_only()   
 
 
 # =================================================

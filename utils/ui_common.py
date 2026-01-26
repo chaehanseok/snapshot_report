@@ -1,6 +1,25 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
+def inject_base_css_only(large_mode: bool = False):
+    font_scale = "1.18" if large_mode else "1.00"
+    css = f"""
+    <style>
+      header {{ display: none !important; }}
+      [data-testid="stToolbar"] {{ display:none !important; }}
+      [data-testid="stDecoration"] {{ display:none !important; }}
+      [data-testid="stStatusWidget"] {{ display:none !important; }}
+      [data-testid="stSidebarNav"] {{ display:none !important; }}
+      [data-testid="stSidebarNavSeparator"] {{ display:none !important; }}
+      iframe[title="Manage app"] {{ display:none !important; }}
+      :root {{ --font-scale: {font_scale}; }}
+      html, body, [class*="css"] {{
+        font-size: calc(16px * var(--font-scale));
+      }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
 def inject_global_css():
     st.markdown(
         """

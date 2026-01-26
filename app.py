@@ -30,7 +30,7 @@ import boto3
 import copy
 from utils.r2 import generate_presigned_pdf_url
 from utils.auth import verify_token
-from utils.ui_common import inject_global_css, cleanup_token_timer_overlay
+from utils.ui_common import inject_global_css, cleanup_token_timer_overlay, inject_base_css_only
 
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
@@ -997,7 +997,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-inject_global_css()   
+inject_base_css_only()   
 
 token = get_auth_token()
 if not token:

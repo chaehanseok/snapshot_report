@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from utils.r2 import generate_presigned_pdf_url
 from utils.auth import verify_token
 from datetime import date
+from utils.ui_common import inject_global_css, cleanup_token_timer_overlay, inject_base_css_only
 
 def to_kst(ts: str) -> str:
     dt = datetime.fromisoformat(ts.replace("Z", ""))
@@ -30,10 +31,21 @@ def get_auth_token() -> str | None:
 # =================================================
 # Page Config (⚠️ 반드시 최상단)
 # =================================================
-st.set_page_config(
-    page_title="내 발행 이력",
-    layout="wide",
+st.set_page_config(page_title="내 발행 이력",layout="wide", initial_sidebar_state="collapsed")
+
+# ✅ 기본 Pages 네비 숨김 (가장 먼저)
+st.markdown(
+    """
+    <style>
+      [data-testid="stSidebarNav"] { display: none !important; }
+      [data-testid="stSidebarNavSeparator"] { display: none !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
+
+inject_base_css_only()   
+
 
 # =================================================
 # 인증 (session_state 기반)
