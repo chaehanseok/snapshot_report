@@ -312,13 +312,7 @@ for r in rows:
                 mime="application/pdf",
                 use_container_width=True,
                 key=f"dl_{r['compliance_code']}",
-                on_click=lambda code=r["compliance_code"]: d1_query(
-                    """
-                    INSERT INTO report_issue_event
-                    (compliance_code, event_type, actor_type, actor_id)
-                    VALUES (?, 'download', 'fc', ?);
-                    """,
-                    [code, fc["fc_code"]],
-                ),
+                on_click=download_and_rerun,
+                args=(r["compliance_code"], fc["fc_code"]),
             )
 
