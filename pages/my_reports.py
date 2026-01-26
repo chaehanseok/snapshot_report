@@ -177,11 +177,11 @@ if f_age != "전체":
     params.append(f_age)
 
 if f_from:
-    where.append("DATE(i.created_at) >= ?")
+    where.append("DATE(i.created_at, '+9 hours') >= ?")
     params.append(str(f_from))
 
 if f_to:
-    where.append("DATE(i.created_at) <= ?")
+    where.append("DATE(i.created_at, '+9 hours') <= ?")
     params.append(str(f_to))
 
 if f_dl == "다운로드완료":
@@ -270,6 +270,8 @@ pending_codes = {
     r["compliance_code"] for r in pending_rows
 }
 
+st.divider()
+
 # =================================================
 # 2️⃣ 발행 목록 표시
 # =================================================
@@ -346,3 +348,4 @@ for r in rows:
                 args=(r["compliance_code"], fc["fc_code"]),
             )
 
+st.divider()

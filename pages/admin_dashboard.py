@@ -142,7 +142,7 @@ def build_issue_log_csv(issues: list[dict]) -> bytes:
             r["fc_name"],
             r["customer_name"] or "",
             r["customer_age_band"],
-            r["created_at"],
+            to_kst(r["created_at"]),
             r["download_cnt"],
             "Y" if r["download_cnt"] > 0 else "N",
         ])
@@ -168,8 +168,9 @@ SELECT
   COUNT(*) AS total_cnt,
   COUNT(DISTINCT fc_id) AS fc_cnt,
   SUM(
-    CASE WHEN DATE(created_at) = DATE('now', '+9 hours')
-    THEN 1 ELSE 0 END
+    WHEN DATE(created_at, '+9 hours') = DATE('now', '+9 hours')
+    THEN 1 ELSE 0
+  END
   ) AS today_cnt,
   MAX(created_at) AS last_issue_at
 FROM report_issue;
@@ -180,7 +181,7 @@ c1, c2, c3, c4 = st.columns(4)
 c1.metric("📄 전체 발행 수", f"{kpi[0]['total_cnt']:,}")
 c2.metric("👤 참여 FC 수", f"{kpi[0]['fc_cnt']:,}")
 c3.metric("🗓 오늘 발행", f"{kpi[0]['today_cnt']:,}")
-c4.metric("⏱ 최근 발행", kpi[0]["last_issue_at"][:16])
+c4.metric("⏱ 최근 발행", to_kst(kpi[0]["last_issue_at"]))
 
 st.divider()
 
@@ -260,11 +261,11 @@ if age_band != "전체":
     params.append(age_band)
 
 if date_from:
-    where.append("DATE(created_at) >= ?")
+    where.append("DATE(created_at, '+9 hours') >= ?")
     params.append(str(date_from))
 
 if date_to:
-    where.append("DATE(created_at) <= ?")
+    where.append("DATE(created_at, '+9 hours') <= ?")
     params.append(str(date_to))
 
 if date_from and date_to and date_from > date_to:
@@ -336,10 +337,9 @@ if rows:   # ⭐⭐⭐ 이 가드가 핵심
     df = pd.DataFrame(rows)
 
     # 🔑 핵심: errors="coerce" + format 명시
-    df["created_at_dt"] = pd.to_datetime(
-        df["created_at"],
-        errors="coerce",
-        format="%Y-%m-%d %H:%M:%S",
+    df["created_at_dt"] = (
+        pd.to_datetime(df["created_at"], errors="coerce", utc=True)
+        .dt.tz_convert("Asia/Seoul")
     )
 
     # NaT 제거
