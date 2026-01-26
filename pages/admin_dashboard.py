@@ -373,10 +373,17 @@ st.divider()
 
 df = pd.DataFrame(rows)
 
-st.write(df[["created_at"]].head())
-st.write(df.dtypes)
+# 🔑 핵심: errors="coerce" + format 명시
+df["created_at_dt"] = pd.to_datetime(
+    df["created_at"],
+    errors="coerce",
+    format="%Y-%m-%d %H:%M:%S",
+)
 
-df["created_date"] = pd.to_datetime(df["created_at"]).dt.date
+# NaT 제거
+df = df.dropna(subset=["created_at_dt"])
+
+df["created_date"] = df["created_at_dt"].dt.date
 
 daily_df = (
     df.groupby("created_date")
