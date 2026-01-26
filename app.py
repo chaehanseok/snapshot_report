@@ -1423,73 +1423,171 @@ components.html(final_html, height=900, scrolling=True)
 st.divider()
 st.subheader("심사요청 (자동) 및 PDF 출력")
 
-if st.button("심사요청"):
+# if st.button("심사요청"):
+#     if not customer_name.strip():
+#         st.warning("고객 성명을 입력해 주세요.")
+#         st.stop()
+    
+#     # 1️⃣ 발행번호 생성 (D1 시퀀스)
+#     compliance_code = generate_compliance_code(
+#         service_name="보장점검",
+#         version=APP_VERSION,
+#     )
+
+#     # 2️⃣ PDF 전용 context 복사 (⭐ 반드시 deepcopy)
+#     pdf_context = copy.deepcopy(context)
+#     pdf_context["customer"]["name"] = customer_name.strip()
+#     pdf_context["segment"]["headline"] = segment["headline"].replace(
+#         "{customer_name}", customer_name.strip()
+#     )
+#     pdf_context["compliance_code"] = (
+#         f"{compliance_code} ({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
+#     )
+
+#     # 3️⃣ PDF HTML 생성
+#     pdf_html = build_final_html_for_both(pdf_context)
+
+#     try:
+#         # 4️⃣ PDF 생성
+#         pdf_bytes = chromium_pdf_bytes(pdf_html)
+
+#         # 5️⃣ 발행 기록
+#         publish_report(
+#             pdf_bytes=pdf_bytes,
+#             compliance_code=compliance_code,
+#             segments_version=APP_VERSION,
+#             fc_id=fc["fc_code"],
+#             fc_name=fc["name"],
+#             customer_name=customer_name.strip(),
+#             customer_gender=gender,
+#             customer_age_band=age_band,
+#             start_year=start_year,
+#             end_year=end_year,
+#             sort_key=sort_key,
+#             min_prev_100k=min_prev_100k,
+#             min_cpp_manwon=min_cpp_manwon,
+#         )
+
+#         # 2️⃣ 발행 이벤트 기록 (⭐ 여기!)
+#         insert_report_event(
+#             compliance_code=compliance_code,
+#             event_type="issue",
+#             actor_type="fc",
+#             actor_id=fc["fc_code"],
+#         )
+
+#         st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
+
+#         st.download_button(
+#             label="📄 심사완료된 PDF 다운로드",
+#             data=pdf_bytes,
+#             file_name=f"{compliance_code}.pdf",
+#             mime="application/pdf",
+#             on_click=lambda: insert_report_event(
+#                 compliance_code=compliance_code,
+#                 event_type="download",
+#                 actor_type="fc",
+#                 actor_id=fc["fc_code"],
+#                 )
+#             )
+
+#     except Exception as e:
+#         st.error(f"발행 중 오류 발생:\n{e}")
+
+btn_col, loading_col = st.columns([1, 3], vertical_alignment="center")
+
+with btn_col:
+    issue_clicked = st.button(
+        "심사요청",
+        disabled=st.session_state["issuing"],
+        use_container_width=True,
+    )
+
+with loading_col:
+    if st.session_state["issuing"]:
+        st.markdown(
+            """
+            <div style="display:flex; align-items:center; gap:8px;">
+                <div class="loader"></div>
+                <span style="color:#666; font-size:0.95rem;">
+                    PDF 생성 및 심사 요청 처리 중입니다…
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+st.markdown(
+    """
+    <style>
+    .loader {
+        width: 18px;
+        height: 18px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #F58220;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+if issue_clicked:
     if not customer_name.strip():
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
-    
-    # 1️⃣ 발행번호 생성 (D1 시퀀스)
-    compliance_code = generate_compliance_code(
-        service_name="보장점검",
-        version=APP_VERSION,
-    )
 
-    # 2️⃣ PDF 전용 context 복사 (⭐ 반드시 deepcopy)
-    pdf_context = copy.deepcopy(context)
-    pdf_context["customer"]["name"] = customer_name.strip()
-    pdf_context["segment"]["headline"] = segment["headline"].replace(
-        "{customer_name}", customer_name.strip()
-    )
-    pdf_context["compliance_code"] = (
-        f"{compliance_code} ({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
-    )
+    # 🔒 로딩 시작
+    st.session_state["issuing"] = True
+    st.rerun()
 
-    # 3️⃣ PDF HTML 생성
-    pdf_html = build_final_html_for_both(pdf_context)
+    if st.session_state["issuing"]:
+        try:
+            # ==========================
+            # 기존 심사요청 처리 로직
+            # ==========================
 
-    try:
-        # 4️⃣ PDF 생성
-        pdf_bytes = chromium_pdf_bytes(pdf_html)
-
-        # 5️⃣ 발행 기록
-        publish_report(
-            pdf_bytes=pdf_bytes,
-            compliance_code=compliance_code,
-            segments_version=APP_VERSION,
-            fc_id=fc["fc_code"],
-            fc_name=fc["name"],
-            customer_name=customer_name.strip(),
-            customer_gender=gender,
-            customer_age_band=age_band,
-            start_year=start_year,
-            end_year=end_year,
-            sort_key=sort_key,
-            min_prev_100k=min_prev_100k,
-            min_cpp_manwon=min_cpp_manwon,
-        )
-
-        # 2️⃣ 발행 이벤트 기록 (⭐ 여기!)
-        insert_report_event(
-            compliance_code=compliance_code,
-            event_type="issue",
-            actor_type="fc",
-            actor_id=fc["fc_code"],
-        )
-
-        st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
-
-        st.download_button(
-            label="📄 심사완료된 PDF 다운로드",
-            data=pdf_bytes,
-            file_name=f"{compliance_code}.pdf",
-            mime="application/pdf",
-            on_click=lambda: insert_report_event(
-                compliance_code=compliance_code,
-                event_type="download",
-                actor_type="fc",
-                actor_id=fc["fc_code"],
-                )
+            compliance_code = generate_compliance_code(
+                service_name="보장점검",
+                version=APP_VERSION,
             )
 
-    except Exception as e:
-        st.error(f"발행 중 오류 발생:\n{e}")
+            pdf_bytes = chromium_pdf_bytes(pdf_html)
+
+            publish_report(
+                pdf_bytes=pdf_bytes,
+                compliance_code=compliance_code,
+                segments_version=APP_VERSION,
+                fc_id=fc["fc_code"],
+                fc_name=fc["name"],
+                customer_name=customer_name.strip(),
+                customer_gender=gender,
+                customer_age_band=age_band,
+                start_year=start_year,
+                end_year=end_year,
+                sort_key=sort_key,
+                min_prev_100k=min_prev_100k,
+                min_cpp_manwon=min_cpp_manwon,
+            )
+
+            insert_report_event(
+                compliance_code=compliance_code,
+                event_type="issue",
+                actor_type="fc",
+                actor_id=fc["fc_code"],
+            )
+
+            st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
+
+        except Exception as e:
+            st.error(f"발행 중 오류 발생:\n{e}")
+
+        finally:
+            # ✅ 로딩 종료
+            st.session_state["issuing"] = False
