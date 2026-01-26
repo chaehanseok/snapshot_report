@@ -1612,5 +1612,5 @@ if st.session_state["issuing"]:
     finally:
         # ✅ 로딩 종료
         st.session_state["issuing"] = False
-         st.session_state.pop("pdf_context", None)
+        st.session_state.pop("pdf_context", None)
         st.session_state.pop("compliance_code", None)
