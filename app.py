@@ -1061,28 +1061,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
-# st.write(f"FC명 : **{fc['name']}**")
-# st.write(f"소속 : **{planner_org_display}**")
-# st.write(f"연락처 : **{planner_phone_display}**")
-# st.divider()
-
-# c1, c2 = st.columns([1, 3])
-
-# with c1:
-#     if st.button("📄 내 발행 이력 보기", use_container_width=True):
-#         # ✅ 1. query_params에 token 설정
-#         st.session_state["auth_token"] = token
-#         st.switch_page("pages/my_reports.py")
-
-#         # ✅ 2. 페이지 이동 (경로만!)
-#         st.switch_page("pages/my_reports.py")
-
-# with c2:
-#     st.caption(
-#         "※ 본인이 발행한 보장점검 리포트의 발행 이력, PDF 열람 및 다운로드 내역을 확인할 수 있습니다."
-#     )
-
 info_col, btn_col = st.columns([3, 1])
 
 with info_col:
@@ -1091,18 +1069,17 @@ with info_col:
     st.markdown(f"연락처 : **{planner_phone_display}**")
 
 with btn_col:
-    if st.button("📄 내 발행 이력", use_container_width=True, help=(
-    "본인이 발행한 보장점검 리포트의\n"
-    "발행 이력 및 PDF 다운로드 내역을\n"
-    "확인할 수 있습니다."
-)):
+    if st.button(
+        "📄 내 발행 이력",
+        use_container_width=True,
+        help=(
+            "본인이 발행한 보장점검 리포트의\n"
+            "발행 이력 및 PDF 다운로드 내역을\n"
+            "확인할 수 있습니다."
+        ),
+    ):
         st.session_state["auth_token"] = token
         st.switch_page("pages/my_reports.py")
-    st.caption(
-        "본인이 발행한 보장점검 리포트의\n"
-        "발행 이력 및 PDF 다운로드 내역을\n"
-        "확인할 수 있습니다."
-    )
 
 st.divider()
 
