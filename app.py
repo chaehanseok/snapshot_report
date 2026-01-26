@@ -1083,7 +1083,7 @@ st.markdown(
 #         "※ 본인이 발행한 보장점검 리포트의 발행 이력, PDF 열람 및 다운로드 내역을 확인할 수 있습니다."
 #     )
 
-info_col, btn_col = st.columns([4, 1])
+info_col, btn_col = st.columns([3, 1])
 
 with info_col:
     st.markdown(f"**FC명 : {fc['name']}**")
