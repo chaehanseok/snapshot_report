@@ -1278,10 +1278,10 @@ context = {
     },
 
     "planner": {
-        "name": f"{planner['name']} FC",
-        "phone": planner["phone"],
-        "email": planner.get("email", None),
-        "org": planner.get("org", "").strip(),
+        "name": f"{fc['name']} FC",
+        "phone": fc["phone"],
+        "email": fc.get("email", None),
+        "org": fc.get("org", "").strip(),
         "company": BRAND_NAME,
         "phone_display": planner_phone_display,
         "org_display": planner_org_display,
