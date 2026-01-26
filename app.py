@@ -31,6 +31,9 @@ import copy
 from utils.r2 import generate_presigned_pdf_url
 from utils.auth import verify_token
 from utils.ui_common import inject_global_css, cleanup_token_timer_overlay, inject_base_css_only
+import json
+import hashlib
+
 
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
@@ -396,6 +399,30 @@ def get_next_daily_seq() -> int:
 
     rows = d1_query(sql, [today])
     return int(rows[0]["seq"])
+
+def make_issue_fingerprint(fp: dict) -> str:
+    raw = json.dumps(fp, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+def has_issued_today(
+    fc_id: str,
+    issue_fingerprint: str,
+) -> bool:
+    sql = """
+    SELECT 1
+    FROM report_issue
+    WHERE fc_id = ?
+      AND issue_fingerprint = ?
+      AND date(created_at) = ?
+    LIMIT 1;
+    """
+    rows = d1_query(sql, [
+        fc_id,
+        issue_fingerprint,
+        today_kst_date_str(),
+    ])
+    return bool(rows)
+
 
 # =========================================================
 # Chart (Top15 combo: bar 1 + line 2)  [유병률 기반]
@@ -1541,10 +1568,17 @@ with btn_col:
     if st.button(
         "심사요청",
         disabled=st.session_state["issuing"] or st.session_state["issued"],
-        use_container_width=True,
-    ):
+        use_container_width=True,):
         if not customer_name.strip():
             st.warning("고객 성명을 입력해 주세요.")
+            st.stop()
+
+        fp = current_issue_fingerprint()
+        fp_hash = make_issue_fingerprint(fp)
+
+        if has_issued_today(fc["fc_code"], fp_hash):
+            st.warning("⚠️ 동일 조건의 리포트는 하루에 1회만 발행할 수 있습니다.")
+            st.session_state["issuing"] = False
             st.stop()
 
         st.session_state["issuing"] = True
@@ -1632,6 +1666,7 @@ if st.session_state["issuing"] and not st.session_state["issued"]:
             event_type="issue",
             actor_type="fc",
             actor_id=fc["fc_code"],
+            issue_fingerprint=fp_hash,
         )
 
         # 5️⃣ 상태 저장
