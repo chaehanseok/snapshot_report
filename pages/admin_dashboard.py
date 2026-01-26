@@ -182,9 +182,10 @@ SELECT
   COUNT(*) AS total_cnt,
   COUNT(DISTINCT fc_id) AS fc_cnt,
   SUM(
-    WHEN DATE(created_at, '+9 hours') = DATE('now', '+9 hours')
-    THEN 1 ELSE 0
-  END
+    CASE
+      WHEN DATE(created_at, '+9 hours') = DATE('now', '+9 hours')
+      THEN 1 ELSE 0
+    END
   ) AS today_cnt,
   MAX(created_at) AS last_issue_at
 FROM report_issue;
