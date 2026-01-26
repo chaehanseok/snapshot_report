@@ -1494,6 +1494,9 @@ st.subheader("심사요청 (자동) 및 PDF 출력")
 #     except Exception as e:
 #         st.error(f"발행 중 오류 발생:\n{e}")
 
+if "issuing" not in st.session_state:
+    st.session_state["issuing"] = False
+
 btn_col, loading_col = st.columns([1, 3], vertical_alignment="center")
 
 with btn_col:
@@ -1547,47 +1550,47 @@ if issue_clicked:
     st.session_state["issuing"] = True
     st.rerun()
 
-    if st.session_state["issuing"]:
-        try:
-            # ==========================
-            # 기존 심사요청 처리 로직
-            # ==========================
+if st.session_state["issuing"]:
+    try:
+        # ==========================
+        # 기존 심사요청 처리 로직
+        # ==========================
 
-            compliance_code = generate_compliance_code(
-                service_name="보장점검",
-                version=APP_VERSION,
-            )
+        compliance_code = generate_compliance_code(
+            service_name="보장점검",
+            version=APP_VERSION,
+        )
 
-            pdf_bytes = chromium_pdf_bytes(pdf_html)
+        pdf_bytes = chromium_pdf_bytes(pdf_html)
 
-            publish_report(
-                pdf_bytes=pdf_bytes,
-                compliance_code=compliance_code,
-                segments_version=APP_VERSION,
-                fc_id=fc["fc_code"],
-                fc_name=fc["name"],
-                customer_name=customer_name.strip(),
-                customer_gender=gender,
-                customer_age_band=age_band,
-                start_year=start_year,
-                end_year=end_year,
-                sort_key=sort_key,
-                min_prev_100k=min_prev_100k,
-                min_cpp_manwon=min_cpp_manwon,
-            )
+        publish_report(
+            pdf_bytes=pdf_bytes,
+            compliance_code=compliance_code,
+            segments_version=APP_VERSION,
+            fc_id=fc["fc_code"],
+            fc_name=fc["name"],
+            customer_name=customer_name.strip(),
+            customer_gender=gender,
+            customer_age_band=age_band,
+            start_year=start_year,
+            end_year=end_year,
+            sort_key=sort_key,
+            min_prev_100k=min_prev_100k,
+            min_cpp_manwon=min_cpp_manwon,
+        )
 
-            insert_report_event(
-                compliance_code=compliance_code,
-                event_type="issue",
-                actor_type="fc",
-                actor_id=fc["fc_code"],
-            )
+        insert_report_event(
+            compliance_code=compliance_code,
+            event_type="issue",
+            actor_type="fc",
+            actor_id=fc["fc_code"],
+        )
 
-            st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
+        st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
 
-        except Exception as e:
-            st.error(f"발행 중 오류 발생:\n{e}")
+    except Exception as e:
+        st.error(f"발행 중 오류 발생:\n{e}")
 
-        finally:
-            # ✅ 로딩 종료
-            st.session_state["issuing"] = False
+    finally:
+        # ✅ 로딩 종료
+        st.session_state["issuing"] = False
