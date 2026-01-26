@@ -210,7 +210,7 @@ st.divider()
 # =================================================
 st.subheader("🔎 발행 목록 필터")
 
-f1, f2, f3, f4, f5 = st.columns(5)
+f1, f2, f3, f4, f5, f6 = st.columns([2, 2, 1.5, 1.5, 1.5, 1])
 
 with f1:
     fc_name = st.text_input("FC 이름")
@@ -229,6 +229,10 @@ with f4:
 
 with f5:
     date_to = st.date_input("종료일")   # ✅ 이것만 추가
+
+with f6:
+    st.markdown("<br>", unsafe_allow_html=True)  # 🔑 라벨 높이 맞추기
+    search_clicked = st.button("🔍 조회", use_container_width=True)
 
 where = ["1=1"]
 params = []
@@ -263,8 +267,7 @@ if date_from and date_to and date_from > date_to:
 if "searched" not in st.session_state:
     st.session_state["searched"] = False
 
-st.markdown("")
-if st.button("🔍 조회", use_container_width=True):
+if search_clicked:
     st.session_state["searched"] = True
 
 if not st.session_state["searched"]:
