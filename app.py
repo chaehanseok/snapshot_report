@@ -1494,30 +1494,59 @@ st.subheader("심사요청 (자동) 및 PDF 출력")
 #     except Exception as e:
 #         st.error(f"발행 중 오류 발생:\n{e}")
 
-if "issuing" not in st.session_state:
+
+# =========================================================
+# 발행 상태 관리 (자동 리셋 포함)
+# =========================================================
+def current_issue_fingerprint():
+    return {
+        "customer_name": customer_name.strip(),
+        "gender": gender,
+        "age_band": age_band,
+        "start_year": start_year,
+        "end_year": end_year,
+        "sort_key": sort_key,
+        "min_prev_100k": min_prev_100k,
+        "min_cpp_manwon": min_cpp_manwon,
+    }
+
+# 세션 상태 초기화
+for k, v in {
+    "issuing": False,
+    "issued": False,
+    "downloaded": False,
+    "issued_pdf_bytes": None,
+    "issued_compliance_code": None,
+    "last_issue_fingerprint": None,
+}.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# ✅ 조건 변경 감지 → 자동 리셋
+current_fp = current_issue_fingerprint()
+if (
+    st.session_state["issued"]
+    and st.session_state["last_issue_fingerprint"] != current_fp
+):
     st.session_state["issuing"] = False
-
-if "issued" not in st.session_state:
     st.session_state["issued"] = False
-
-if "issued_pdf_bytes" not in st.session_state:
+    st.session_state["downloaded"] = False
     st.session_state["issued_pdf_bytes"] = None
-
-if "issued_compliance_code" not in st.session_state:
     st.session_state["issued_compliance_code"] = None
+    st.session_state["last_issue_fingerprint"] = None
 
-
+st.subheader("심사요청 (자동) 및 PDF 출력")
 
 btn_col, loading_col = st.columns([1, 3], vertical_alignment="center")
 
 with btn_col:
     issue_clicked = st.button(
         "심사요청",
+        use_container_width=True,
         disabled=(
             st.session_state["issuing"]
             or st.session_state["issued"]
         ),
-        use_container_width=True,
     )
 
 with loading_col:
@@ -1543,6 +1572,7 @@ with loading_col:
             unsafe_allow_html=True,
         )
 
+# 로딩 애니메이션 CSS
 st.markdown(
     """
     <style>
@@ -1554,7 +1584,6 @@ st.markdown(
         border-radius: 50%;
         animation: spin 1s linear infinite;
     }
-
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
@@ -1564,6 +1593,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# =========================================================
+# 심사요청 실행
+# =========================================================
 if issue_clicked:
     if not customer_name.strip():
         st.warning("고객 성명을 입력해 주세요.")
@@ -1618,8 +1650,10 @@ if issue_clicked:
 
         # 5️⃣ 상태 저장
         st.session_state["issued"] = True
+        st.session_state["downloaded"] = False
         st.session_state["issued_pdf_bytes"] = pdf_bytes
         st.session_state["issued_compliance_code"] = compliance_code
+        st.session_state["last_issue_fingerprint"] = current_fp
 
         st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
 
@@ -1628,17 +1662,25 @@ if issue_clicked:
 
     finally:
         st.session_state["issuing"] = False
+        st.rerun()
 
+# =========================================================
+# PDF 다운로드
+# =========================================================
 if st.session_state["issued"]:
     st.download_button(
         label="📄 심사완료된 PDF 다운로드",
         data=st.session_state["issued_pdf_bytes"],
         file_name=f"{st.session_state['issued_compliance_code']}.pdf",
         mime="application/pdf",
-        on_click=lambda: insert_report_event(
-            compliance_code=st.session_state["issued_compliance_code"],
-            event_type="download",
-            actor_type="fc",
-            actor_id=fc["fc_code"],
+        disabled=st.session_state["downloaded"],
+        on_click=lambda: (
+            insert_report_event(
+                compliance_code=st.session_state["issued_compliance_code"],
+                event_type="download",
+                actor_type="fc",
+                actor_id=fc["fc_code"],
+            ),
+            st.session_state.update({"downloaded": True})
         ),
     )
