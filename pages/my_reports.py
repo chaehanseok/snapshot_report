@@ -5,6 +5,11 @@ from zoneinfo import ZoneInfo
 from utils.r2 import generate_presigned_pdf_url
 from utils.auth import verify_token
 
+def to_kst(ts: str) -> str:
+    dt = datetime.fromisoformat(ts.replace("Z", ""))
+    return dt.astimezone(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
+
+
 # =================================================
 # Page Config (⚠️ 반드시 최상단)
 # =================================================
@@ -108,6 +113,9 @@ SELECT
   compliance_code,
   customer_name,
   customer_age_band,
+  start_year,
+  end_year,
+  sort_key,
   created_at,
   pdf_r2_key,
   pdf_filename
@@ -181,14 +189,19 @@ if pending_rows:
         pdf_url = generate_presigned_pdf_url(r["pdf_r2_key"])
 
         with st.container(border=True):
-            c1, c2, c3, c4, c5 = st.columns([3, 2, 1, 2, 2])
+            c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 1, 2, 2, 1.5])
 
             c1.markdown(f"**{r['compliance_code']}**")
+
             c2.write(r["customer_name"] or "-")
             c3.write(r["customer_age_band"])
-            c4.write(r["created_at"][:16])
-
-            with c5:
+            c4.write(to_kst(r["created_at"]))
+            c5.caption(
+                f"{status}\n"
+                f"📊 통계기간: {r['start_year']} ~ {r['end_year']} | "
+                f"🔢 정렬기준: {r['sort_key']}"
+            )
+            with c6:
                 st.download_button(
                     "⬇ 지금 다운로드",
                     data=requests.get(pdf_url, timeout=30).content,
@@ -215,7 +228,7 @@ for r in rows:
     status = "⬇ 다운로드 완료" if downloaded else "⬇ 다운로드 필요"
 
     with st.container(border=True):
-        c1, c2, c3, c4, c5 = st.columns([3, 2, 1, 2, 1.5])
+        c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 1, 2, 2, 1.5])
 
         # 🔹 심의번호 + 상태
         c1.markdown(f"**{r['compliance_code']}**")
@@ -223,10 +236,15 @@ for r in rows:
 
         c2.write(r["customer_name"] or "-")
         c3.write(r["customer_age_band"])
-        c4.write(r["created_at"][:16])
+        c4.write(to_kst(r["created_at"]))
+        c5.caption(
+            f"{status}\n"
+            f"📊 통계기간: {r['start_year']} ~ {r['end_year']} | "
+            f"🔢 정렬기준: {r['sort_key']}"
+        ) 
 
         # ⬇ 다운로드 (유일한 액션)
-        with c5:
+        with c6:
             st.download_button(
                 label="⬇ PDF 다운로드",
                 data=requests.get(pdf_url, timeout=30).content,
