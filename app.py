@@ -30,7 +30,7 @@ import boto3
 import copy
 from utils.r2 import generate_presigned_pdf_url
 from utils.auth import verify_token
-
+from utils.ui_common import inject_global_css, cleanup_token_timer_overlay
 
 # =========================================================
 # Playwright runtime config (Streamlit Cloud-safe)
@@ -984,6 +984,19 @@ def chromium_pdf_bytes(html: str) -> bytes:
 # =========================================================
 # Streamlit UI
 # =========================================================
+# ✅ 기본 Pages 네비 숨김 (가장 먼저)
+st.markdown(
+    """
+    <style>
+      [data-testid="stSidebarNav"] { display: none !important; }
+      [data-testid="stSidebarNavSeparator"] { display: none !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+inject_global_css()   
+
 st.set_page_config(page_title="보장 점검 유인 팜플렛", layout="centered")
 
 token = get_auth_token()
