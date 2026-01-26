@@ -1010,8 +1010,8 @@ else:
 
 segments_db = load_json(SEGMENTS_PATH)
 
-planner_org_display = org_display(BRAND_NAME, planner.get("org", ""))
-planner_phone_display = format_phone_3_4_4(planner["phone"])
+planner_org_display = org_display(BRAND_NAME, fc.get("org", ""))
+planner_phone_display = format_phone_3_4_4(fc["phone"])
 
 st.success("미래에셋금융서비스 소속 인증 완료")
 st.write(f"FC명 : **{planner['name']}**")
