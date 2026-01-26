@@ -82,32 +82,6 @@ def d1_query(sql: str, params: list):
 
     return data["result"][0]["results"] if data.get("result") else []
 
-# def insert_view_once_per_day(compliance_code: str, fc_code: str):
-#     exists = d1_query(
-#         """
-#         SELECT 1
-#         FROM report_issue_event
-#         WHERE
-#           compliance_code = ?
-#           AND event_type = 'view'
-#           AND actor_type = 'fc'
-#           AND actor_id = ?
-#           AND DATE(created_at, '+9 hours') = DATE('now', '+9 hours')
-#         LIMIT 1;
-#         """,
-#         [compliance_code, fc_code],
-#     )
-
-#     if not exists:
-#         d1_query(
-#             """
-#             INSERT INTO report_issue_event
-#             (compliance_code, event_type, actor_type, actor_id)
-#             VALUES (?, 'view', 'fc', ?);
-#             """,
-#             [compliance_code, fc_code],
-#         )
-
 def download_and_rerun(code: str, fc_code: str):
     d1_query(
         """
@@ -123,22 +97,23 @@ def download_and_rerun(code: str, fc_code: str):
 # =================================================
 # Header
 # =================================================
-st.title("📄 내 발행 이력")
-st.caption(f"FC: {fc['name']} ({fc['fc_code']})")
+title_col, btn_col = st.columns([4, 1])
+
+with title_col:
+    st.title("📄 내 발행 이력")
+    st.caption(f"FC: {fc['name']} ({fc['fc_code']})")
+
+with btn_col:
+    st.markdown("<br>", unsafe_allow_html=True)  # 타이틀 높이 맞춤
+    if st.button("🏠 메인으로", use_container_width=True):
+        # session_state에 토큰 유지된 상태에서 이동
+        st.switch_page("app.py")
+
 
 kst_now = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
 st.caption(f"기준 시각(KST): {kst_now}")
 
 st.divider()
-
-col_left, col_right = st.columns([1, 6])
-with col_left:
-    if st.button("🏠 메인으로", use_container_width=True):
-        # URL에 token을 다시 주입 (세션이 날아가도 메인이 복구 가능)
-        st.query_params["token"] = token
-
-        # 메인 페이지로 이동 (파일 경로는 프로젝트에 맞게)
-        st.switch_page("app.py")
 
 # =================================================
 # 1️⃣ 조회 필터
