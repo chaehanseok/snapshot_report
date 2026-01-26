@@ -392,12 +392,21 @@ daily_df = (
       .sort_values("created_date")
 )
 
-if not daily_df.empty:
-    st.line_chart(
+if daily_df.empty:
+    st.info("조회 결과 기준 통계 데이터가 없습니다.")
+elif len(daily_df) == 1:
+    # 하루만 있을 때 → 막대 그래프
+    st.bar_chart(
         daily_df,
         x="created_date",
         y="cnt",
         use_container_width=True,
     )
 else:
-    st.info("조회 결과 기준 통계 데이터가 없습니다.")
+    # 여러 날 → 선 그래프
+    st.line_chart(
+        daily_df,
+        x="created_date",
+        y="cnt",
+        use_container_width=True,
+    )
