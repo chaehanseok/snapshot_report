@@ -226,24 +226,35 @@ SELECT
   i.pdf_filename,
 
   CASE
-    WHEN EXISTS (
-      SELECT 1
-      FROM report_issue_event e
-      WHERE e.compliance_code = i.compliance_code
-        AND e.event_type = 'download'
-        AND e.actor_type = 'fc'
-        AND e.actor_id = ?
-    )
-    THEN 1 ELSE 0
+    WHEN COUNT(e.id) > 0 THEN 1 ELSE 0
   END AS is_downloaded
 
 FROM report_issue i
+LEFT JOIN report_issue_event e
+  ON i.compliance_code = e.compliance_code
+ AND e.event_type = 'download'
+ AND e.actor_type = 'fc'
+ AND e.actor_id = ?
+
 WHERE {' AND '.join(where)}
+
+GROUP BY
+  i.compliance_code,
+  i.customer_name,
+  i.customer_age_band,
+  i.start_year,
+  i.end_year,
+  i.sort_key,
+  i.created_at,
+  i.pdf_r2_key,
+  i.pdf_filename
+
 ORDER BY i.created_at DESC
 LIMIT 100;
+
 """
 
-rows = d1_query(sql, params + [fc["fc_code"]])
+rows = d1_query(sql, [fc["fc_code"]] + params)
 
 if not rows:
     st.info("아직 발행한 리포트가 없습니다.")
