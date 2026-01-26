@@ -1497,6 +1497,16 @@ st.subheader("심사요청 (자동) 및 PDF 출력")
 if "issuing" not in st.session_state:
     st.session_state["issuing"] = False
 
+if "issued" not in st.session_state:
+    st.session_state["issued"] = False
+
+if "issued_pdf_bytes" not in st.session_state:
+    st.session_state["issued_pdf_bytes"] = None
+
+if "issued_compliance_code" not in st.session_state:
+    st.session_state["issued_compliance_code"] = None
+
+
 btn_col, loading_col = st.columns([1, 3], vertical_alignment="center")
 
 with btn_col:
@@ -1545,38 +1555,50 @@ if issue_clicked:
     if not customer_name.strip():
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
-    
-    # 1️⃣ 발행번호 생성
-    compliance_code = generate_compliance_code(
-        service_name="보장점검",
-        version=APP_VERSION,
-    )
 
-    # 2️⃣ PDF 전용 context 생성 (⭐ 여기!)
-    pdf_context = copy.deepcopy(context)
-    pdf_context["customer"]["name"] = customer_name.strip()
-    pdf_context["segment"]["headline"] = segment["headline"].replace(
-        "{customer_name}", customer_name.strip()
-    )
-    pdf_context["compliance_code"] = (
-        f"{compliance_code} ({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
-    )
-
-    # 3️⃣ 세션에 저장 (rerun 대비)
-    st.session_state["pdf_context"] = pdf_context
-    st.session_state["compliance_code"] = compliance_code
-
-    # 4️⃣ 로딩 시작
     st.session_state["issuing"] = True
-    st.rerun()
+    st.session_state["issued"] = False
+    st.rerun()    
+    
+    # # 1️⃣ 발행번호 생성
+    # compliance_code = generate_compliance_code(
+    #     service_name="보장점검",
+    #     version=APP_VERSION,
+    # )
+
+    # # 2️⃣ PDF 전용 context 생성 (⭐ 여기!)
+    # pdf_context = copy.deepcopy(context)
+    # pdf_context["customer"]["name"] = customer_name.strip()
+    # pdf_context["segment"]["headline"] = segment["headline"].replace(
+    #     "{customer_name}", customer_name.strip()
+    # )
+    # pdf_context["compliance_code"] = (
+    #     f"{compliance_code} ({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
+    # )
+
+    # # 3️⃣ 세션에 저장 (rerun 대비)
+    # st.session_state["pdf_context"] = pdf_context
+    # st.session_state["compliance_code"] = compliance_code
+
+    # # 4️⃣ 로딩 시작
+    # st.session_state["issuing"] = True
+    # st.rerun()
 
 if st.session_state["issuing"]:
     try:
-        pdf_context = st.session_state.get("pdf_context")
-        compliance_code = st.session_state.get("compliance_code")
+        compliance_code = generate_compliance_code(
+            service_name="보장점검",
+            version=APP_VERSION,
+        )
 
-        if not pdf_context or not compliance_code:
-            raise RuntimeError("PDF 발행 정보가 유실되었습니다.")
+        pdf_context = copy.deepcopy(context)
+        pdf_context["customer"]["name"] = customer_name.strip()
+        pdf_context["segment"]["headline"] = segment["headline"].replace(
+            "{customer_name}", customer_name.strip()
+        )
+        pdf_context["compliance_code"] = (
+            f"{compliance_code} ({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
+        )
 
         pdf_html = build_final_html_for_both(pdf_context)
         pdf_bytes = chromium_pdf_bytes(pdf_html)
@@ -1604,6 +1626,11 @@ if st.session_state["issuing"]:
             actor_id=fc["fc_code"],
         )
 
+        # ✅ 결과 저장
+        st.session_state["issued_pdf_bytes"] = pdf_bytes
+        st.session_state["issued_compliance_code"] = compliance_code
+        st.session_state["issued"] = True
+
         st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
 
     except Exception as e:
@@ -1612,5 +1639,18 @@ if st.session_state["issuing"]:
     finally:
         # ✅ 로딩 종료
         st.session_state["issuing"] = False
-        st.session_state.pop("pdf_context", None)
-        st.session_state.pop("compliance_code", None)
+        st.rerun()
+
+if st.session_state["issued"]:
+    st.download_button(
+        label="📄 심사완료된 PDF 다운로드",
+        data=st.session_state["issued_pdf_bytes"],
+        file_name=f"{st.session_state['issued_compliance_code']}.pdf",
+        mime="application/pdf",
+        on_click=lambda: insert_report_event(
+            compliance_code=st.session_state["issued_compliance_code"],
+            event_type="download",
+            actor_type="fc",
+            actor_id=fc["fc_code"],
+        ),
+    )
