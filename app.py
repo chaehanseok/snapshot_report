@@ -1376,8 +1376,8 @@ if st.button("확정 후 PDF 생성"):
             pdf_bytes=pdf_bytes,
             compliance_code=compliance_code,
             segments_version=APP_VERSION,
-            fc_id=planner["fc_code"],
-            fc_name=planner["name"],
+            fc_id=fc["fc_code"],
+            fc_name=fc["name"],
             customer_name=customer_name.strip(),
             customer_gender=gender,
             customer_age_band=age_band,
@@ -1393,7 +1393,7 @@ if st.button("확정 후 PDF 생성"):
             compliance_code=compliance_code,
             event_type="issue",
             actor_type="fc",
-            actor_id=planner["fc_code"],
+            actor_id=fc["fc_code"],
         )
 
         st.success(f"✅ 발행 완료 · 심의번호: {compliance_code}")
@@ -1407,7 +1407,7 @@ if st.button("확정 후 PDF 생성"):
                 compliance_code=compliance_code,
                 event_type="download",
                 actor_type="fc",
-                actor_id=planner["fc_code"],
+                actor_id=fc["fc_code"],
                 )
             )
 
