@@ -93,6 +93,17 @@ def d1_query(sql: str, params: list):
 #             [compliance_code, fc_code],
 #         )
 
+def download_and_rerun(code: str, fc_code: str):
+    d1_query(
+        """
+        INSERT INTO report_issue_event
+        (compliance_code, event_type, actor_type, actor_id)
+        VALUES (?, 'download', 'fc', ?);
+        """,
+        [code, fc_code],
+    )
+    st.experimental_rerun()
+
 
 # =================================================
 # Header
@@ -106,26 +117,114 @@ st.caption(f"기준 시각(KST): {kst_now}")
 st.divider()
 
 # =================================================
+# 1️⃣ 조회 필터
+# =================================================
+
+st.subheader("🔎 조회 필터")
+
+f1, f2, f3, f4, f5 = st.columns([2, 1.5, 1.5, 1.5, 1])
+
+with f1:
+    f_customer = st.text_input("고객명")
+
+with f2:
+    f_age = st.selectbox(
+        "연령대",
+        ["전체", "20대", "30대", "40대", "50대", "60대", "70대"],
+    )
+
+with f3:
+    f_from = st.date_input("시작일")
+
+with f4:
+    f_to = st.date_input("종료일")
+
+with f5:
+    f_dl = st.selectbox(
+        "다운로드 상태",
+        ["전체", "다운로드완료", "다운로드필요"],
+    )
+
+
+where = ["i.fc_id = ?"]
+params = [fc["fc_code"]]
+
+if f_customer:
+    where.append("i.customer_name LIKE ?")
+    params.append(f"%{f_customer}%")
+
+if f_age != "전체":
+    where.append("i.customer_age_band = ?")
+    params.append(f_age)
+
+if f_from:
+    where.append("DATE(i.created_at) >= ?")
+    params.append(str(f_from))
+
+if f_to:
+    where.append("DATE(i.created_at) <= ?")
+    params.append(str(f_to))
+
+if f_dl == "다운로드완료":
+    where.append("""
+        EXISTS (
+            SELECT 1
+            FROM report_issue_event e
+            WHERE e.compliance_code = i.compliance_code
+              AND e.event_type = 'download'
+              AND e.actor_type = 'fc'
+              AND e.actor_id = ?
+        )
+    """)
+    params.append(fc["fc_code"])
+
+elif f_dl == "다운로드필요":
+    where.append("""
+        NOT EXISTS (
+            SELECT 1
+            FROM report_issue_event e
+            WHERE e.compliance_code = i.compliance_code
+              AND e.event_type = 'download'
+              AND e.actor_type = 'fc'
+              AND e.actor_id = ?
+        )
+    """)
+    params.append(fc["fc_code"])
+
+# =================================================
 # 1️⃣ 내 발행 목록 조회
 # =================================================
-sql = """
+sql = f"""
 SELECT
-  compliance_code,
-  customer_name,
-  customer_age_band,
-  start_year,
-  end_year,
-  sort_key,
-  created_at,
-  pdf_r2_key,
-  pdf_filename
-FROM report_issue
-WHERE fc_id = ?
-ORDER BY created_at DESC
+  i.compliance_code,
+  i.customer_name,
+  i.customer_age_band,
+  i.start_year,
+  i.end_year,
+  i.sort_key,
+  i.created_at,
+  i.pdf_r2_key,
+  i.pdf_filename,
+
+  CASE
+    WHEN EXISTS (
+      SELECT 1
+      FROM report_issue_event e
+      WHERE e.compliance_code = i.compliance_code
+        AND e.event_type = 'download'
+        AND e.actor_type = 'fc'
+        AND e.actor_id = ?
+    )
+    THEN 1 ELSE 0
+  END AS is_downloaded
+
+FROM report_issue i
+WHERE {' AND '.join(where)}
+ORDER BY i.created_at DESC
 LIMIT 100;
 """
 
-rows = d1_query(sql, [fc["fc_code"]])
+rows = d1_query(sql, params + [fc["fc_code"]])
 
 if not rows:
     st.info("아직 발행한 리포트가 없습니다.")
@@ -135,48 +234,10 @@ if not rows:
 # 1️⃣ 안내려받은 리포트 조회
 # =================================================
 
-sql_pending = """
-SELECT
-    i.compliance_code,
-    i.customer_name,
-    i.customer_age_band,
-    i.start_year,
-    i.end_year,
-    i.sort_key,
-    i.created_at,
-    i.pdf_r2_key,
-    i.pdf_filename
-FROM report_issue i
-WHERE i.fc_id = ?
-AND EXISTS (
-    SELECT 1
-    FROM report_issue_event e
-    WHERE
-      e.compliance_code = i.compliance_code
-      AND e.event_type = 'view'
-      AND e.actor_type = 'fc'
-      AND e.actor_id = ?
-)
-AND NOT EXISTS (
-    SELECT 1
-    FROM report_issue_event e
-    WHERE
-      e.compliance_code = i.compliance_code
-      AND e.event_type = 'download'
-      AND e.actor_type = 'fc'
-      AND e.actor_id = ?
-)
-ORDER BY i.created_at DESC;
-"""
+pending_rows = [r for r in rows if not r["is_downloaded"]]
 
-pending_rows = d1_query(
-    sql_pending,
-    [fc["fc_code"], fc["fc_code"], fc["fc_code"]],
-)
-
-# ✅ 여기 추가
 pending_codes = {
-    p["compliance_code"] for p in pending_rows
+    r["compliance_code"] for r in pending_rows
 }
 
 # =================================================
@@ -213,14 +274,8 @@ if pending_rows:
                     mime="application/pdf",
                     use_container_width=True,
                     key=f"pending_dl_{r['compliance_code']}",
-                    on_click=lambda code=r["compliance_code"]: d1_query(
-                        """
-                        INSERT INTO report_issue_event
-                        (compliance_code, event_type, actor_type, actor_id)
-                        VALUES (?, 'download', 'fc', ?);
-                        """,
-                        [code, fc["fc_code"]],
-                    ),
+                    on_click=download_and_rerun,
+                    args=(r["compliance_code"], fc["fc_code"]),
                 )
 st.divider()
 
