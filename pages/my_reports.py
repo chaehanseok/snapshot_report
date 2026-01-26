@@ -122,29 +122,48 @@ st.divider()
 
 st.subheader("🔎 조회 필터")
 
-f1, f2, f3, f4, f5 = st.columns([2, 1.5, 1.5, 1.5, 1])
+if "searched" not in st.session_state:
+    st.session_state["searched"] = False
 
-with f1:
-    f_customer = st.text_input("고객명")
+with st.form("my_reports_filter_form"):
+    f1, f2, f3, f4, f5, f6 = st.columns([2, 1.5, 1.5, 1.5, 1.5, 1])
 
-with f2:
-    f_age = st.selectbox(
-        "연령대",
-        ["전체", "20대", "30대", "40대", "50대", "60대", "70대"],
-    )
+    with f1:
+        f_customer = st.text_input("고객명")
 
-with f3:
-    f_from = st.date_input("시작일")
+    with f2:
+        f_age = st.selectbox(
+            "연령대",
+            ["전체", "20대", "30대", "40대", "50대", "60대", "70대"],
+        )
 
-with f4:
-    f_to = st.date_input("종료일")
+    with f3:
+        f_from = st.date_input("시작일")
 
-with f5:
-    f_dl = st.selectbox(
-        "다운로드 상태",
-        ["전체", "다운로드완료", "다운로드필요"],
-    )
+    with f4:
+        f_to = st.date_input("종료일")
 
+    with f5:
+        f_dl = st.selectbox(
+            "다운로드 상태",
+            ["전체", "다운로드완료", "다운로드필요"],
+        )
+
+    with f6:
+        st.markdown("<br>", unsafe_allow_html=True)
+        search_clicked = st.form_submit_button("🔍 조회", use_container_width=True)
+
+if search_clicked:
+    st.session_state["searched"] = True
+
+if not st.session_state["searched"]:
+    st.info("조건을 입력한 후 [조회] 버튼을 눌러주세요.")
+    st.stop()
+
+# 날짜 검증은 버튼 이후에
+if f_from and f_to and f_from > f_to:
+    st.warning("종료일은 시작일 이후여야 합니다.")
+    st.stop()
 
 where = ["i.fc_id = ?"]
 params = [fc["fc_code"]]
