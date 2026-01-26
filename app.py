@@ -1546,6 +1546,9 @@ if issue_clicked:
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
 
+    # 🔹 PDF용 HTML 미리 생성해서 세션에 저장
+    st.session_state["pdf_html"] = build_final_html_for_both(pdf_context)
+
     # 🔒 로딩 시작
     st.session_state["issuing"] = True
     st.rerun()
@@ -1555,12 +1558,10 @@ if st.session_state["issuing"]:
         # ==========================
         # 기존 심사요청 처리 로직
         # ==========================
-
-        compliance_code = generate_compliance_code(
-            service_name="보장점검",
-            version=APP_VERSION,
-        )
-
+        pdf_html = st.session_state.get("pdf_html")
+        if not pdf_html:
+            raise RuntimeError("PDF HTML 생성 정보가 없습니다.")
+        
         pdf_bytes = chromium_pdf_bytes(pdf_html)
 
         publish_report(
@@ -1594,3 +1595,4 @@ if st.session_state["issuing"]:
     finally:
         # ✅ 로딩 종료
         st.session_state["issuing"] = False
+        st.session_state.pop("pdf_html", None)  # ✅ 정리
