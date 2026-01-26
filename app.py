@@ -1545,23 +1545,40 @@ if issue_clicked:
     if not customer_name.strip():
         st.warning("고객 성명을 입력해 주세요.")
         st.stop()
+    
+    # 1️⃣ 발행번호 생성
+    compliance_code = generate_compliance_code(
+        service_name="보장점검",
+        version=APP_VERSION,
+    )
 
-    # 🔹 PDF용 HTML 미리 생성해서 세션에 저장
-    st.session_state["pdf_html"] = build_final_html_for_both(pdf_context)
+    # 2️⃣ PDF 전용 context 생성 (⭐ 여기!)
+    pdf_context = copy.deepcopy(context)
+    pdf_context["customer"]["name"] = customer_name.strip()
+    pdf_context["segment"]["headline"] = segment["headline"].replace(
+        "{customer_name}", customer_name.strip()
+    )
+    pdf_context["compliance_code"] = (
+        f"{compliance_code} ({today:%Y.%m.%d}~{expire:%Y.%m.%d})"
+    )
 
-    # 🔒 로딩 시작
+    # 3️⃣ 세션에 저장 (rerun 대비)
+    st.session_state["pdf_context"] = pdf_context
+    st.session_state["compliance_code"] = compliance_code
+
+    # 4️⃣ 로딩 시작
     st.session_state["issuing"] = True
     st.rerun()
 
 if st.session_state["issuing"]:
     try:
-        # ==========================
-        # 기존 심사요청 처리 로직
-        # ==========================
-        pdf_html = st.session_state.get("pdf_html")
-        if not pdf_html:
-            raise RuntimeError("PDF HTML 생성 정보가 없습니다.")
-        
+        pdf_context = st.session_state.get("pdf_context")
+        compliance_code = st.session_state.get("compliance_code")
+
+        if not pdf_context or not compliance_code:
+            raise RuntimeError("PDF 발행 정보가 유실되었습니다.")
+
+        pdf_html = build_final_html_for_both(pdf_context)
         pdf_bytes = chromium_pdf_bytes(pdf_html)
 
         publish_report(
@@ -1595,4 +1612,5 @@ if st.session_state["issuing"]:
     finally:
         # ✅ 로딩 종료
         st.session_state["issuing"] = False
-        st.session_state.pop("pdf_html", None)  # ✅ 정리
+         st.session_state.pop("pdf_context", None)
+        st.session_state.pop("compliance_code", None)
