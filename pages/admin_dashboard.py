@@ -10,6 +10,7 @@ from utils.auth import verify_token
 from utils.r2 import generate_presigned_pdf_url
 import csv
 import pandas as pd
+from datetime import date
 
 
 def to_kst(ts: str) -> str:
@@ -192,7 +193,7 @@ FROM report_issue;
 """
 kpi = d1_query(sql_kpi, [])
 
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4 = st.columns([1,1,1,3])
 c1.metric("📄 전체 발행 수", f"{kpi[0]['total_cnt']:,}")
 c2.metric("👤 참여 FC 수", f"{kpi[0]['fc_cnt']:,}")
 c3.metric("🗓 오늘 발행", f"{kpi[0]['today_cnt']:,}")
@@ -220,8 +221,14 @@ with f3:
         ["전체", "20대", "30대", "40대", "50대", "60대", "70대"],
     )
 
+today = date.today()
+default_from = today.replace(day=1)
+
 with f4:
-    date_from = st.date_input("시작일")
+    date_from = st.date_input(
+        "시작일",
+        value=default_from
+    )
 
 with f5:
     date_to = st.date_input("종료일")   # ✅ 이것만 추가

@@ -4,6 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from utils.r2 import generate_presigned_pdf_url
 from utils.auth import verify_token
+from datetime import date
 
 def to_kst(ts: str) -> str:
     dt = datetime.fromisoformat(ts.replace("Z", ""))
@@ -136,8 +137,14 @@ with st.form("my_reports_filter_form"):
             ["전체", "20대", "30대", "40대", "50대", "60대", "70대"],
         )
 
+    today = date.today()
+    default_from = today.replace(day=1)
+
     with f3:
-        f_from = st.date_input("시작일")
+        date_from = st.date_input(
+            "시작일",
+            value=default_from
+        )
 
     with f4:
         f_to = st.date_input("종료일")
