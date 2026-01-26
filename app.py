@@ -1081,20 +1081,18 @@ st.markdown(
 #         st.session_state["auth_token"] = token
 #         st.switch_page("pages/my_reports.py")
 
-st.markdown(
-    f"""
-    <div style="
-        background-color:#FFF3E8;
-        border-left:6px solid #F58220;
-        padding:14px 18px;
-        border-radius:8px;
-        margin-bottom:16px;
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        gap:16px;
-    ">
-        <div style="line-height:1.4; font-size:14px; color:#333;">
+info_col, btn_col = st.columns([4, 1.5], vertical_alignment="center")
+
+with info_col:
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#FFF3E8;
+            border-left:6px solid #F58220;
+            padding:14px 18px;
+            border-radius:8px;
+            line-height:1.45;
+        ">
             <div style="font-weight:700; color:#F58220; margin-bottom:6px;">
                 👤 FC 정보
             </div>
@@ -1102,39 +1100,22 @@ st.markdown(
             <div><b>소속</b> : {planner_org_display}</div>
             <div><b>연락처</b> : {planner_phone_display}</div>
         </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-        <div style="min-width:180px;">
-            <form action="#">
-                <button style="
-                    width:100%;
-                    padding:10px 12px;
-                    border:1px solid #d0d0d0;
-                    border-radius:8px;
-                    background:#ffffff;
-                    cursor:pointer;
-                    font-size:14px;
-                ">
-                    📄 내 발행 이력
-                </button>
-            </form>
-            <div style="font-size:12px; color:#777; margin-top:6px; line-height:1.3;">
-                본인이 발행한 보장점검 리포트의<br/>
-                발행 이력 및 PDF 다운로드 내역을<br/>
-                확인할 수 있습니다.
-            </div>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# 실제 이동 로직은 Streamlit 버튼으로 따로 처리
-if st.button("내 발행 이력 이동", key="hidden_my_reports_btn", help="내 발행 이력으로 이동", disabled=True):
-    pass
-
-if st.session_state.get("go_my_reports"):
-    st.session_state["auth_token"] = token
-    st.switch_page("pages/my_reports.py")
+with btn_col:
+    if st.button(
+        "📄 내 발행 이력",
+        use_container_width=True,
+        help=(
+            "본인이 발행한 보장점검 리포트의\n"
+            "발행 이력 및 PDF 다운로드 내역을\n"
+            "확인할 수 있습니다."
+        ),
+    ):
+        st.session_state["auth_token"] = token
+        st.switch_page("pages/my_reports.py")
 
 
 st.divider()
