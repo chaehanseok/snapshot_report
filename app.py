@@ -1061,14 +1061,54 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-info_col, btn_col = st.columns([3, 1])
+# info_col, btn_col = st.columns([3, 1])
+
+# with info_col:
+#     st.markdown(f"**FC명 : {fc['name']}**")
+#     st.markdown(f"소속 : **{planner_org_display}**")
+#     st.markdown(f"연락처 : **{planner_phone_display}**")
+
+# with btn_col:
+#     if st.button(
+#         "📄 내 발행 이력",
+#         use_container_width=True,
+#         help=(
+#             "본인이 발행한 보장점검 리포트의\n"
+#             "발행 이력 및 PDF 다운로드 내역을\n"
+#             "확인할 수 있습니다."
+#         ),
+#     ):
+#         st.session_state["auth_token"] = token
+#         st.switch_page("pages/my_reports.py")
+
+info_col, btn_col = st.columns([4, 1])
 
 with info_col:
-    st.markdown(f"**FC명 : {fc['name']}**")
-    st.markdown(f"소속 : **{planner_org_display}**")
-    st.markdown(f"연락처 : **{planner_phone_display}**")
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#FFF3E8;
+            border-left:6px solid #F58220;
+            padding:12px 16px;
+            border-radius:6px;
+            line-height:1.45;
+        ">
+            <div style="font-weight:700; color:#F58220; margin-bottom:4px;">
+                👤 FC 정보
+            </div>
+            <div style="color:#333333; font-size:14px;">
+                <div><strong>FC명</strong> : {fc['name']}</div>
+                <div><strong>소속</strong> : {planner_org_display}</div>
+                <div><strong>연락처</strong> : {planner_phone_display}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 with btn_col:
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)  # 🔹 미세 높이 보정
+
     if st.button(
         "📄 내 발행 이력",
         use_container_width=True,
@@ -1080,6 +1120,13 @@ with btn_col:
     ):
         st.session_state["auth_token"] = token
         st.switch_page("pages/my_reports.py")
+
+    st.caption(
+        "본인이 발행한 보장점검 리포트의\n"
+        "발행 이력 및 PDF 다운로드 내역을\n"
+        "확인할 수 있습니다."
+    )
+
 
 st.divider()
 
