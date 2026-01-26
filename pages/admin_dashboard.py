@@ -9,7 +9,7 @@ from io import StringIO
 from utils.auth import verify_token
 from utils.r2 import generate_presigned_pdf_url
 import csv
-
+import pandas as pd
 
 
 # =================================================
@@ -370,50 +370,24 @@ st.divider()
 # =================================================
 # 6️⃣ 통계 차트
 # =================================================
-st.subheader("📈 최근 30일 발행 추이")
 
-sql_daily = """
-SELECT
-  DATE(created_at) AS d,
-  COUNT(*) AS cnt
-FROM report_issue
-WHERE created_at >= DATE('now', '-30 days', '+9 hours')
-GROUP BY d
-ORDER BY d;
-"""
-daily = d1_query(sql_daily, [])
+df = pd.DataFrame(rows)
 
-if daily:
+df["created_date"] = pd.to_datetime(df["created_at"]).dt.date
+
+daily_df = (
+    df.groupby("created_date")
+      .size()
+      .reset_index(name="cnt")
+      .sort_values("created_date")
+)
+
+if not daily_df.empty:
     st.line_chart(
-        {
-            "날짜": [r["d"] for r in daily],
-            "발행 건수": [r["cnt"] for r in daily],
-        },
-        x="날짜",
-        y="발행 건수",
+        daily_df,
+        x="created_date",
+        y="cnt",
         use_container_width=True,
     )
-
-st.subheader("🏆 FC 발행 TOP 10")
-
-sql_fc = """
-SELECT
-  fc_name,
-  COUNT(*) AS cnt
-FROM report_issue
-GROUP BY fc_id, fc_name
-ORDER BY cnt DESC
-LIMIT 10;
-"""
-fc_rows = d1_query(sql_fc, [])
-
-if fc_rows:
-    st.bar_chart(
-        {
-            "FC": [r["fc_name"] for r in fc_rows],
-            "발행 건수": [r["cnt"] for r in fc_rows],
-        },
-        x="FC",
-        y="발행 건수",
-        use_container_width=True,
-    )
+else:
+    st.info("조회 결과 기준 통계 데이터가 없습니다.")
