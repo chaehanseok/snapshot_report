@@ -275,6 +275,74 @@ if not st.session_state["searched"]:
     st.stop()
 
 # =================================================
+# 6️⃣ 통계 차트 (조회 결과 기준)
+# =================================================
+
+st.subheader("📈 조회 결과 통계")
+
+df = pd.DataFrame(rows)
+
+# 🔑 핵심: errors="coerce" + format 명시
+df["created_at_dt"] = pd.to_datetime(
+    df["created_at"],
+    errors="coerce",
+    format="%Y-%m-%d %H:%M:%S",
+)
+
+# NaT 제거
+df = df.dropna(subset=["created_at_dt"])
+df["created_date"] = df["created_at_dt"].dt.date
+
+daily_df = (
+    df.groupby("created_date")
+      .size()
+      .reset_index(name="cnt")
+      .sort_values("created_date")
+)
+
+st.markdown("#### 📅 일자별 발행 건수")
+
+if daily_df.empty:
+    st.info("조회 결과 기준 통계 데이터가 없습니다.")
+elif len(daily_df) == 1:
+    # 하루만 있을 때 → 막대 그래프
+    st.bar_chart(
+        daily_df,
+        x="created_date",
+        y="cnt",
+        use_container_width=True,
+    )
+else:
+    # 여러 날 → 선 그래프
+    st.line_chart(
+        daily_df,
+        x="created_date",
+        y="cnt",
+        use_container_width=True,
+    )
+
+st.markdown("#### 🏆 FC별 발행 건수 TOP 20")
+
+fc_df = (
+    df.groupby("fc_name")
+      .size()
+      .reset_index(name="cnt")
+      .sort_values("cnt", ascending=False)
+      .head(20)
+)
+
+if fc_df.empty:
+    st.info("FC별 통계 데이터가 없습니다.")
+else:
+    st.bar_chart(
+        fc_df,
+        x="fc_name",
+        y="cnt",
+        use_container_width=True,
+    )
+
+
+# =================================================
 # 3️⃣ 발행 목록 조회
 # =================================================
 sql_list = f"""
@@ -367,46 +435,3 @@ with col_b:
 st.divider()
 
 
-# =================================================
-# 6️⃣ 통계 차트
-# =================================================
-
-df = pd.DataFrame(rows)
-
-# 🔑 핵심: errors="coerce" + format 명시
-df["created_at_dt"] = pd.to_datetime(
-    df["created_at"],
-    errors="coerce",
-    format="%Y-%m-%d %H:%M:%S",
-)
-
-# NaT 제거
-df = df.dropna(subset=["created_at_dt"])
-
-df["created_date"] = df["created_at_dt"].dt.date
-
-daily_df = (
-    df.groupby("created_date")
-      .size()
-      .reset_index(name="cnt")
-      .sort_values("created_date")
-)
-
-if daily_df.empty:
-    st.info("조회 결과 기준 통계 데이터가 없습니다.")
-elif len(daily_df) == 1:
-    # 하루만 있을 때 → 막대 그래프
-    st.bar_chart(
-        daily_df,
-        x="created_date",
-        y="cnt",
-        use_container_width=True,
-    )
-else:
-    # 여러 날 → 선 그래프
-    st.line_chart(
-        daily_df,
-        x="created_date",
-        y="cnt",
-        use_container_width=True,
-    )
