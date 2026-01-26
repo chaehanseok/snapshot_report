@@ -1103,7 +1103,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
 with st.container():
     st.markdown(
         f"""
@@ -1145,11 +1144,6 @@ with st.container():
 
 
 st.divider()
-
-
-# st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
-# st.write("KST 오늘 날짜:", today_kst_date_str())
-# st.write("오늘 발행 건수:", get_today_report_issue_count())
 
 # -------------------------
 # 고객 기본 정보 (한 줄 정렬)
@@ -1334,23 +1328,6 @@ else:
 
 st.divider()
 
-# =========================================================
-# 문구 커스터마이징 + HTML/PDF 미리보기/출력
-# =========================================================
-# st.subheader("문구 조정(표준 문구를 커스터마이징 가능합니다.)")
-# summary_lines = segment["summary_lines"][:]
-# gap_questions = segment["gap_questions"][:]
-# cta_text = segment["cta"]
-
-# summary_lines[0] = st.text_input("요약 1", value=summary_lines[0])
-# summary_lines[1] = st.text_input("요약 2", value=summary_lines[1])
-# summary_lines[2] = st.text_input("요약 3", value=summary_lines[2])
-
-# gap_questions[0] = st.text_input("점검 질문 1", value=gap_questions[0])
-# gap_questions[1] = st.text_input("점검 질문 2", value=gap_questions[1])
-
-# cta_text = st.text_area("CTA 문구", value=cta_text, height=90)
-
 structure_rows = [
     {"area": "진단비", "reason": "진단 직후 초기 자금 여력(목돈) 점검"},
     {"area": "치료비", "reason": "치료 과정의 반복 비용·통원/수술 부담 점검"},
@@ -1449,7 +1426,27 @@ context = {
 final_html = build_final_html_for_both(context)
 
 st.subheader("미리보기")
+
+st.markdown(
+    """
+    <style>
+    .preview-wrapper {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+    .preview-wrapper iframe {
+        max-width: 900px;   /* A4 기준 */
+        width: 100%;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown('<div class="preview-wrapper">', unsafe_allow_html=True)
 components.html(final_html, height=900, scrolling=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 st.subheader("심사요청 (자동) 및 PDF 출력")
