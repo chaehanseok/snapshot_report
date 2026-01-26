@@ -1125,7 +1125,7 @@ with st.container():
             st.session_state["auth_token"] = token
             st.switch_page("pages/my_reports.py")
 
-st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 st.divider()
 
