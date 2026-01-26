@@ -31,6 +31,14 @@ def verify_token(token: str) -> dict:
 
     payload = json.loads(payload_raw.decode())
 
+    # =========================
+    # ✅ 만료 시간 검증
+    # =========================
+    exp = payload.get("exp")
+    if exp is not None:
+        if int(time.time()) > int(exp):
+            raise ValueError("Token expired")
+
     role = payload.get("role", "fc")
 
     name = payload.get("name")
@@ -43,7 +51,7 @@ def verify_token(token: str) -> dict:
         if not phone or not fc_code:
             raise ValueError("Missing FC fields")
     else:  # admin
-        phone = payload.get("phone")  # optional
+        phone = payload.get("phone")
         fc_code = None
 
     return {
@@ -54,4 +62,5 @@ def verify_token(token: str) -> dict:
         "org": payload.get("org"),
         "role": role,
         "id": payload.get("id"),
+        "exp": exp,   # ✅ 반드시 반환
     }

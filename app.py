@@ -1034,12 +1034,16 @@ planner_org_display = org_display(BRAND_NAME, fc.get("org", ""))
 planner_phone_display = format_phone_3_4_4(fc["phone"])
 
 st.write("DEBUG token payload:", user)
-token_exp = user.get("exp")   # verify_token 결과에서
-st.success("미래에셋금융서비스 소속 인증 완료")
-st.caption(
-    f"🔐 토큰 만료 시각(KST): **{format_token_exp(token_exp)}**"
-)
 
+st.success("미래에셋금융서비스 소속 인증 완료")
+
+token_exp = user.get("exp")   # verify_token 결과에서
+if token_exp:
+    exp_kst = datetime.fromtimestamp(exp, ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M")
+    st.caption(f"🔐 토큰 만료 시각(KST): {exp_kst}")
+else:
+    st.caption("🔐 토큰 만료 시각: 만료 정보 없음")
+    
 st.write(f"FC명 : **{fc['name']}**")
 st.write(f"소속 : **{planner_org_display}**")
 st.write(f"연락처 : **{planner_phone_display}**")
