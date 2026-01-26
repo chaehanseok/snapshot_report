@@ -991,13 +991,21 @@ if not token:
     st.error("유효한 접속 정보가 없습니다. M.POST 게이트웨이 링크로 접속해 주세요.")
     st.stop()
 
-fc = verify_token(token)  # 여기서 검증
+user = verify_token(token)
 
-try:
-    planner = verify_token(token)
-    fc_code = planner["fc_code"]
-except Exception as e:
-    st.error(f"접속 검증 실패: {e}")
+if user.get("role") == "admin":
+    st.info("관리자 계정으로 접속했습니다.")
+    # 👉 관리자 전용 UI를 보여주거나
+    # 👉 이 페이지가 FC 전용이면 아래처럼 차단
+    st.error("이 페이지는 FC 전용 화면입니다.")
+    st.stop()
+
+elif user.get("fc_code"):
+    fc = user
+    fc_code = user["fc_code"]
+
+else:
+    st.error("유효한 FC 접속 정보가 없습니다.")
     st.stop()
 
 segments_db = load_json(SEGMENTS_PATH)
