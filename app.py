@@ -1061,46 +1061,19 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# info_col, btn_col = st.columns([3, 1])
-
-# with info_col:
-#     st.markdown(f"**FC명 : {fc['name']}**")
-#     st.markdown(f"소속 : **{planner_org_display}**")
-#     st.markdown(f"연락처 : **{planner_phone_display}**")
-
-# with btn_col:
-#     if st.button(
-#         "📄 내 발행 이력",
-#         use_container_width=True,
-#         help=(
-#             "본인이 발행한 보장점검 리포트의\n"
-#             "발행 이력 및 PDF 다운로드 내역을\n"
-#             "확인할 수 있습니다."
-#         ),
-#     ):
-#         st.session_state["auth_token"] = token
-#         st.switch_page("pages/my_reports.py")
-
 with st.container():
-    st.markdown(
-        """
-        <div style="
-            background-color:#FFF3E8;
-            border-left:6px solid #F58220;
-            padding:16px 18px;
-            border-radius:10px;
-            margin-bottom:8px;
-        ">
-        """,
-        unsafe_allow_html=True,
-    )
-
     info_col, btn_col = st.columns([4, 1.5], vertical_alignment="center")
 
     with info_col:
         st.markdown(
             f"""
-            <div style="line-height:1.5;">
+            <div style="
+                background-color:#FFF3E8;
+                border-left:6px solid #F58220;
+                padding:16px 18px;
+                border-radius:10px;
+                line-height:1.5;
+            ">
                 <div style="font-weight:700; color:#F58220; margin-bottom:6px;">
                     👤 FC 정보
                 </div>
@@ -1125,10 +1098,7 @@ with st.container():
             st.session_state["auth_token"] = token
             st.switch_page("pages/my_reports.py")
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
 st.divider()
-
 
 
 # st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
