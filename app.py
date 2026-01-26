@@ -1549,6 +1549,7 @@ for k, v in {
     "issued_pdf_bytes": None,
     "issued_compliance_code": None,
     "last_issue_fingerprint": None,
+    "pending_fp_hash": None,   # ✅ 추가
 }.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -1565,6 +1566,7 @@ if (
     st.session_state["issued_pdf_bytes"] = None
     st.session_state["issued_compliance_code"] = None
     st.session_state["last_issue_fingerprint"] = None
+    st.session_state["pending_fp_hash"] = None
 
 btn_col, _ = st.columns([1, 3])
 
@@ -1585,6 +1587,7 @@ with btn_col:
             st.session_state["issuing"] = False
             st.stop()
 
+        st.session_state["pending_fp_hash"] = fp_hash   # ✅ 추가
         st.session_state["issuing"] = True
         st.rerun()
 
@@ -1663,7 +1666,7 @@ if st.session_state["issuing"] and not st.session_state["issued"]:
             sort_key=sort_key,
             min_prev_100k=min_prev_100k,
             min_cpp_manwon=min_cpp_manwon,
-            issue_fingerprint=fp_hash,
+            issue_fingerprint=st.session_state["pending_fp_hash"],  # ✅ 수정
         )
 
         insert_report_event(
@@ -1687,6 +1690,7 @@ if st.session_state["issuing"] and not st.session_state["issued"]:
 
     finally:
         st.session_state["issuing"] = False
+        st.session_state["pending_fp_hash"] = None   # ✅ 추가
         st.rerun()
 
 # =========================================================
