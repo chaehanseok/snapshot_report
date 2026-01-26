@@ -1041,32 +1041,53 @@ if token_exp:
 else:
     exp_text = "\n🔐 토큰 만료 시각(KST): 만료 정보 없음"
 
-st.success(
-    "미래에셋금융서비스 소속 인증 완료"
-    + exp_text
+st.success("미래에셋금융서비스 소속 인증 완료")
+
+st.markdown(
+    f"<span style='color:#555;font-size:0.9rem;'>"
+    f"🔐 토큰 만료 시각(KST): <b>{exp_kst}</b>"
+    f"</span>",
+    unsafe_allow_html=True
 )
 
-st.write(f"FC명 : **{fc['name']}**")
-st.write(f"소속 : **{planner_org_display}**")
-st.write(f"연락처 : **{planner_phone_display}**")
-st.divider()
+# st.write(f"FC명 : **{fc['name']}**")
+# st.write(f"소속 : **{planner_org_display}**")
+# st.write(f"연락처 : **{planner_phone_display}**")
+# st.divider()
 
-c1, c2 = st.columns([1, 3])
+# c1, c2 = st.columns([1, 3])
 
-with c1:
-    if st.button("📄 내 발행 이력 보기", use_container_width=True):
-        # ✅ 1. query_params에 token 설정
+# with c1:
+#     if st.button("📄 내 발행 이력 보기", use_container_width=True):
+#         # ✅ 1. query_params에 token 설정
+#         st.session_state["auth_token"] = token
+#         st.switch_page("pages/my_reports.py")
+
+#         # ✅ 2. 페이지 이동 (경로만!)
+#         st.switch_page("pages/my_reports.py")
+
+# with c2:
+#     st.caption(
+#         "※ 본인이 발행한 보장점검 리포트의 발행 이력, PDF 열람 및 다운로드 내역을 확인할 수 있습니다."
+#     )
+
+col_left, col_right = st.columns([4, 1])
+
+with col_left:
+    st.write(f"FC명 : **{planner['name']}**")
+    st.write(f"소속 : **{planner_org_display}**")
+    st.write(f"연락처 : **{planner_phone_display}**")
+
+with col_right:
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("📄 내 발행 이력", use_container_width=True):
         st.session_state["auth_token"] = token
         st.switch_page("pages/my_reports.py")
-
-        # ✅ 2. 페이지 이동 (경로만!)
-        st.switch_page("pages/my_reports.py")
-
-with c2:
     st.caption(
-        "※ 본인이 발행한 보장점검 리포트의 발행 이력, PDF 열람 및 다운로드 내역을 확인할 수 있습니다."
+        "본인이 발행한 보장점검 리포트의\n"
+        "발행 이력 및 PDF 다운로드 내역을\n"
+        "확인할 수 있습니다."
     )
-
 
 # st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
 # st.write("KST 오늘 날짜:", today_kst_date_str())
