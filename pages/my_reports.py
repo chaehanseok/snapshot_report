@@ -116,6 +116,12 @@ st.caption(f"기준 시각(KST): {kst_now}")
 
 st.divider()
 
+col_left, col_right = st.columns([6, 1])
+
+with col_right:
+    if st.button("🏠 메인으로 돌아가기", use_container_width=True):
+        st.switch_page("app.py")
+        
 # =================================================
 # 1️⃣ 조회 필터
 # =================================================
