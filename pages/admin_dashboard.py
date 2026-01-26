@@ -294,8 +294,6 @@ LIMIT 200;
 
 rows = d1_query(sql_list, params)
 
-st.subheader("📋 발행 목록")
-
 if not rows:
     st.info("조회 결과가 없습니다.")
     st.stop()
@@ -379,6 +377,8 @@ st.divider()
 # =================================================
 # 4️⃣ 발행 목록 테이블
 # =================================================
+st.subheader("📋 발행 목록")
+
 for r in rows:
     with st.container(border=True):
         c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 2, 2, 1, 1])
