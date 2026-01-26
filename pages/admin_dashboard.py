@@ -81,7 +81,7 @@ def d1_query(sql: str, params: list):
 
 def build_issue_log_csv(issues: list[dict]) -> bytes:
     """
-    조회된 발행 목록 기준 로그 CSV 생성 (정상 집계 버전)
+    조회된 발행 목록 기준 다운로드 로그 CSV 생성
     """
     if not issues:
         return b""
@@ -96,35 +96,12 @@ def build_issue_log_csv(issues: list[dict]) -> bytes:
       i.customer_name,
       i.customer_age_band,
       i.created_at,
-
-      -- ✅ 미리보기 수: FC 기준 · 하루 1회
-      COUNT(
-        DISTINCT
-        CASE
-          WHEN e.event_type = 'view'
-           AND e.actor_type = 'fc'
-          THEN e.actor_id || DATE(e.created_at, '+9 hours')
-        END
-      ) AS view_cnt,
-
-      -- ✅ 다운로드 수: FC 기준 전체
       COUNT(
         CASE
           WHEN e.event_type LIKE '%download%'
-           AND e.actor_type = 'fc'
           THEN 1
         END
-      ) AS download_cnt,
-
-      -- ✅ 최근 미리보기 시각 (FC 기준)
-      MAX(
-        CASE
-          WHEN e.event_type = 'view'
-           AND e.actor_type = 'fc'
-          THEN e.created_at
-        END
-      ) AS last_view_at
-
+      ) AS download_cnt
     FROM report_issue i
     LEFT JOIN report_issue_event e
       ON i.compliance_code = e.compliance_code
@@ -149,9 +126,8 @@ def build_issue_log_csv(issues: list[dict]) -> bytes:
         "고객명",
         "연령대",
         "발행일시",
-        "미리보기 수",
         "다운로드 수",
-        "최근 미리보기 시각",
+        "다운로드 여부",
     ])
 
     for r in rows:
@@ -161,13 +137,11 @@ def build_issue_log_csv(issues: list[dict]) -> bytes:
             r["customer_name"] or "",
             r["customer_age_band"],
             r["created_at"],
-            r["view_cnt"],
             r["download_cnt"],
-            r["last_view_at"] or "",
+            "Y" if r["download_cnt"] > 0 else "N",
         ])
 
-    return buf.getvalue().encode("utf-8-sig")  # 엑셀 한글 깨짐 방지
-
+    return buf.getvalue().encode("utf-8-sig")
 
 def build_zip_from_issues(issues):
     zip_buf = BytesIO()
@@ -210,7 +184,7 @@ st.divider()
 # =================================================
 st.subheader("🔎 발행 목록 필터")
 
-f1, f2, f3, f4, f5, f6 = st.columns([2, 2, 1.5, 1.5, 1.5, 1])
+f1, f2, f3, f4, f5, f6, f7 = st.columns([2, 2, 1.5, 1.5, 1.5, 2, 1])
 
 with f1:
     fc_name = st.text_input("FC 이름")
@@ -231,11 +205,37 @@ with f5:
     date_to = st.date_input("종료일")   # ✅ 이것만 추가
 
 with f6:
+    download_status = st.selectbox(
+        "다운로드 상태",
+        ["전체", "다운로드완료", "다운로드필요"],
+    )
+
+with f7:
     st.markdown("<br>", unsafe_allow_html=True)  # 🔑 라벨 높이 맞추기
     search_clicked = st.button("🔍 조회", use_container_width=True)
 
 where = ["1=1"]
 params = []
+
+if download_status == "다운로드완료":
+    where.append("""
+        EXISTS (
+          SELECT 1
+          FROM report_issue_event e
+          WHERE e.compliance_code = i.compliance_code
+            AND e.event_type LIKE '%download%'
+        )
+    """)
+
+elif download_status == "다운로드필요":
+    where.append("""
+        NOT EXISTS (
+          SELECT 1
+          FROM report_issue_event e
+          WHERE e.compliance_code = i.compliance_code
+            AND e.event_type LIKE '%download%'
+        )
+    """)
 
 if fc_name:
     where.append("fc_name LIKE ?")
@@ -279,19 +279,31 @@ if not st.session_state["searched"]:
 # =================================================
 sql_list = f"""
 SELECT
-  compliance_code,
-  fc_name,
-  customer_name,
-  customer_age_band,
-  start_year,
-  end_year,
-  sort_key,
-  created_at,
-  pdf_r2_key,
-  pdf_filename
-FROM report_issue
+  i.compliance_code,
+  i.fc_name,
+  i.customer_name,
+  i.customer_age_band,
+  i.start_year,
+  i.end_year,
+  i.sort_key,
+  i.created_at,
+  i.pdf_r2_key,
+  i.pdf_filename,
+
+    -- ✅ 다운로드 여부 (핵심)
+  CASE
+    WHEN EXISTS (
+      SELECT 1
+      FROM report_issue_event e
+      WHERE e.compliance_code = i.compliance_code
+        AND e.event_type LIKE '%download%'
+    )
+    THEN 1 ELSE 0
+  END AS is_downloaded
+
+FROM report_issue i
 WHERE {' AND '.join(where)}
-ORDER BY created_at DESC
+ORDER BY i.created_at DESC
 LIMIT 200;
 """
 
@@ -309,8 +321,6 @@ st.divider()
 st.subheader("📈 조회 결과 통계")
 
 if rows:   # ⭐⭐⭐ 이 가드가 핵심
-
-
     df = pd.DataFrame(rows)
 
     # 🔑 핵심: errors="coerce" + format 명시
@@ -386,8 +396,15 @@ for r in rows:
     with st.container(border=True):
         c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 3, 1.5])
 
+        status_label = (
+            "⬇ 다운로드 완료" if r["is_downloaded"]
+            else "⚠️ 다운로드 필요"
+        )
+
+
         # 심의번호
         c1.markdown(f"**{r['compliance_code']}**")
+        c1.caption(status_label)
 
         # FC / 고객
         c2.write(r["fc_name"])
@@ -431,13 +448,13 @@ with col_a:
             )
 
 with col_b:
-    if st.button("📊 발행 로그 CSV 다운로드"):
+    if st.button("📊 다운로드 현황 CSV 다운로드"):
         csv_bytes = build_issue_log_csv(rows)
 
         st.download_button(
             label="📥 CSV 다운로드",
             data=csv_bytes,
-            file_name=f"report_logs_{ts}.csv",
+            file_name=f"download_status_{ts}.csv",
             mime="text/csv",
         )
 
