@@ -137,12 +137,15 @@ if not rows:
 
 sql_pending = """
 SELECT
-  i.compliance_code,
-  i.customer_name,
-  i.customer_age_band,
-  i.created_at,
-  i.pdf_r2_key,
-  i.pdf_filename
+    i.compliance_code,
+    i.customer_name,
+    i.customer_age_band,
+    i.start_year,
+    i.end_year,
+    i.sort_key,
+    i.created_at,
+    i.pdf_r2_key,
+    i.pdf_filename
 FROM report_issue i
 WHERE i.fc_id = ?
 AND EXISTS (
