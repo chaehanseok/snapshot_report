@@ -35,9 +35,10 @@ def verify_token(token: str) -> dict:
     # ✅ 만료 시간 검증
     # =========================
     exp = payload.get("exp")
-    if exp is not None:
-        if int(time.time()) > int(exp):
-            raise ValueError("Token expired")
+    now = int(time.time())
+
+    if exp is not None and now > int(exp):
+        raise ValueError("Token expired")
 
     role = payload.get("role", "fc")
 
