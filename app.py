@@ -185,6 +185,7 @@ def insert_report_issue(
     pdf_filename: str,
     compliance_code: str,
     segments_version: str,
+    issue_fingerprint: str
 ):
     sql = """
     INSERT INTO report_issue (
@@ -193,8 +194,9 @@ def insert_report_issue(
         start_year, end_year, sort_key,
         min_prev_100k, min_cpp_manwon,
         pdf_r2_key, pdf_filename,
-        compliance_code, segments_version
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        compliance_code, segments_version,
+        issue_fingerprint
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
     params = [
         fc_id, fc_name,
@@ -202,7 +204,7 @@ def insert_report_issue(
         start_year, end_year, sort_key,
         min_prev_100k, min_cpp_manwon,
         pdf_r2_key, pdf_filename,
-        compliance_code, segments_version,
+        compliance_code, segments_version, issue_fingerprint,
     ]
     d1_query(sql, params)
 
@@ -1659,6 +1661,7 @@ if st.session_state["issuing"] and not st.session_state["issued"]:
             sort_key=sort_key,
             min_prev_100k=min_prev_100k,
             min_cpp_manwon=min_cpp_manwon,
+            issue_fingerprint=fp_hash,
         )
 
         insert_report_event(
@@ -1666,7 +1669,6 @@ if st.session_state["issuing"] and not st.session_state["issued"]:
             event_type="issue",
             actor_type="fc",
             actor_id=fc["fc_code"],
-            issue_fingerprint=fp_hash,
         )
 
         # 5️⃣ 상태 저장
@@ -1710,7 +1712,7 @@ if st.session_state["issued"]:
         unsafe_allow_html=True,
     )
 
-    st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
 
     st.download_button(
         label="📄 심사완료된 PDF 다운로드",
