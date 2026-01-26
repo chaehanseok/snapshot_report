@@ -1081,20 +1081,25 @@ st.markdown(
 #         st.session_state["auth_token"] = token
 #         st.switch_page("pages/my_reports.py")
 
+st.markdown(
+    """
+    <div style="
+        background-color:#FFF3E8;
+        border-left:6px solid #F58220;
+        padding:14px 16px;
+        border-radius:8px;
+        margin-bottom:12px;
+    ">
+    """,
+    unsafe_allow_html=True,
+)
+
 info_col, btn_col = st.columns([4, 1])
 
 with info_col:
     st.markdown(
         f"""
-        <div style="
-            background-color:#FFF3E8;
-            border-left:6px solid #F58220;
-            padding:12px 16px;
-            border-radius:6px;
-            line-height:1.35;
-            font-size:14px;
-            color:#333;
-        ">
+        <div style="line-height:1.35; font-size:14px; color:#333;">
             <div style="font-weight:700; color:#F58220; margin-bottom:6px;">
                 👤 FC 정보
             </div>
@@ -1107,7 +1112,7 @@ with info_col:
     )
 
 with btn_col:
-    # FC 정보 첫 줄과 버튼 높이 맞추기
+    # 수직 중앙 정렬용 여백
     st.markdown("<div style='height:34px'></div>", unsafe_allow_html=True)
 
     if st.button(
@@ -1122,7 +1127,10 @@ with btn_col:
         st.session_state["auth_token"] = token
         st.switch_page("pages/my_reports.py")
 
+st.markdown("</div>", unsafe_allow_html=True)
+
 st.divider()
+
 
 # st.write(d1_query("SELECT name FROM sqlite_master WHERE type='table';", []))
 # st.write("KST 오늘 날짜:", today_kst_date_str())
